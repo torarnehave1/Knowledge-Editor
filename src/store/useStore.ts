@@ -360,6 +360,7 @@ export const useStore = create<AppState>()(
 
       logout: () => {
         localStorage.removeItem('user');
+        localStorage.removeItem('emailVerificationToken');
         set({ user: null });
       },
 
@@ -371,6 +372,7 @@ export const useStore = create<AppState>()(
           emailVerificationToken: 'dev-token'
         };
         localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('emailVerificationToken', mockUser.emailVerificationToken);
         set({ user: mockUser });
       },
 
@@ -403,6 +405,7 @@ export const useStore = create<AppState>()(
               };
 
               localStorage.setItem('user', JSON.stringify(user));
+              localStorage.setItem('emailVerificationToken', magicToken);
               set({ user });
               
               // Clean URL

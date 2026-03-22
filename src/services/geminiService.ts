@@ -1,11 +1,20 @@
 
+import { GoogleGenAI } from "@google/genai";
+
 const VEGVISR_API_URL = "https://api.vegvisr.org/worker-ai/chat";
 const VEGVISR_API_TOKEN_RAW = import.meta.env.VITE_VEGVISR_API_TOKEN;
 const VEGVISR_API_TOKEN = (VEGVISR_API_TOKEN_RAW && VEGVISR_API_TOKEN_RAW !== "undefined") 
   ? VEGVISR_API_TOKEN_RAW 
   : "gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac";
 
-export async function askGemini(prompt: string, currentContent?: string | null, provider: string = "gemini", model?: string, customSystem?: string) {
+export async function askGemini(
+  prompt: string, 
+  currentContent?: string | null, 
+  provider: string = "gemini", 
+  model?: string, 
+  customSystem?: string,
+  history: { role: string, content: string }[] = []
+) {
   const defaultSystem = `
     You are a Knowledge Graph Assistant. Your goal is to help users build and refine their knowledge graphs.
     
@@ -52,23 +61,20 @@ export async function askGemini(prompt: string, currentContent?: string | null, 
     const body: any = {
       provider,
       system: systemInstruction,
-      messages: [
+      messages: history.length > 0 ? history : [
         { role: "user", content: prompt }
       ]
     };
 
-    // Only include model if it's a non-empty string
     if (model && model.trim() !== '') {
       body.model = model;
     }
-
-    const token = localStorage.getItem('emailVerificationToken') || VEGVISR_API_TOKEN;
 
     const response = await fetch(VEGVISR_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': token,
+        'X-API-Token': localStorage.getItem('emailVerificationToken') || '',
       },
       body: JSON.stringify(body)
     });
@@ -81,14 +87,12 @@ export async function askGemini(prompt: string, currentContent?: string | null, 
 
     const data = await response.json();
     
-    // Handle different response formats
     let content = data.content || 
                   data.message?.content || 
                   data.choices?.[0]?.message?.content || 
                   data.result || 
                   '';
     
-    // If content is an array (common in Anthropic/Claude responses)
     if (Array.isArray(content)) {
       content = content.map((part: any) => part.text || '').join('');
     }
