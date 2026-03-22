@@ -828,9 +828,10 @@ export const useStore = create<AppState>()(
 
       fetchAvailableModels: async () => {
         try {
+          const userToken = localStorage.getItem('emailVerificationToken');
           const response = await fetch('https://api.vegvisr.org/worker-ai/models', {
             headers: {
-              'X-API-Token': localStorage.getItem('emailVerificationToken') as string
+              'X-API-Token': userToken || ''
             }
           });
           if (!response.ok) throw new Error('Failed to fetch models');

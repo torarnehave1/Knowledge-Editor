@@ -2,8 +2,9 @@
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
+const API_TOKEN = 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
 
-const getApiToken = () => localStorage.getItem('emailVerificationToken');
+const getApiToken = () => API_TOKEN;
 
 export interface MetaAreaItem {
   name: string;

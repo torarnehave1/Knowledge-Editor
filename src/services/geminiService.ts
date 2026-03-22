@@ -72,7 +72,7 @@ export async function askGemini(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': userToken as string,
+        'X-API-Token': userToken || '',
       },
       body: JSON.stringify(body)
     });
