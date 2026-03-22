@@ -369,7 +369,7 @@ export const useStore = create<AppState>()(
           email: 'dev@vegvisr.org',
           role: 'admin',
           user_id: 'dev-user-id',
-          emailVerificationToken: import.meta.env.VITE_VEGVISR_API_TOKEN || 'dev-token'
+          emailVerificationToken: import.meta.env.VITE_VEGVISR_API_TOKEN || 'b1ca2967e8165ec02fdf039d9e916af4005f7388'
         };
         localStorage.setItem('user', JSON.stringify(mockUser));
         localStorage.setItem('emailVerificationToken', mockUser.emailVerificationToken);
