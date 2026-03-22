@@ -175,9 +175,11 @@ interface AppState {
   isGenerating: boolean;
   saveStatus: SaveStatus;
   error: string | null;
+  historyError: string | null;
   isNewGraphModalOpen: boolean;
   isReorderModalOpen: boolean;
   isSEOModalOpen: boolean;
+  isVersionHistoryModalOpen: boolean;
   seoStatus: 'idle' | 'generating' | 'success' | 'error';
   seoUrl: string | null;
   newGraphTitle: string;
@@ -185,6 +187,7 @@ interface AppState {
   deleteConfirmationId: string | null;
   editingNodeId: string | null;
   user: User | null;
+  versionHistory: { version: number; timestamp: string }[];
   
   // AI Settings
   aiProvider: string;
@@ -203,6 +206,7 @@ interface AppState {
   setIsNewGraphModalOpen: (isOpen: boolean) => void;
   setIsReorderModalOpen: (isOpen: boolean) => void;
   setIsSEOModalOpen: (isOpen: boolean) => void;
+  setIsVersionHistoryModalOpen: (isOpen: boolean) => void;
   setNewGraphTitle: (title: string) => void;
   setNewGraphMetaArea: (area: string) => void;
   setDeleteConfirmationId: (id: string | null) => void;
@@ -210,6 +214,7 @@ interface AppState {
   setUser: (user: User | null) => void;
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
+  setVersionHistory: (history: { version: number; timestamp: string }[]) => void;
 
   // Auth Actions
   login: (email: string) => Promise<void>;
@@ -220,11 +225,13 @@ interface AppState {
   // Async Actions
   fetchGraphs: () => Promise<void>;
   fetchTrash: () => Promise<void>;
+  fetchVersionHistory: () => Promise<void>;
   loadGraph: (id: string) => Promise<void>;
   saveGraph: (id?: string) => Promise<void>;
   createNewGraph: () => Promise<void>;
   deleteGraph: () => Promise<void>;
   restoreGraph: (trashId: string) => Promise<void>;
+  restoreVersion: (version: number) => Promise<void>;
   askAI: (id: string, prompt: string) => Promise<void>;
   generateSEODescription: (title: string) => Promise<string>;
   generateSEOKeywords: (title: string) => Promise<string>;
@@ -257,9 +264,11 @@ export const useStore = create<AppState>()(
       isGenerating: false,
       saveStatus: 'idle',
       error: null,
+      historyError: null,
       isNewGraphModalOpen: false,
       isReorderModalOpen: false,
       isSEOModalOpen: false,
+      isVersionHistoryModalOpen: false,
       seoStatus: 'idle',
       seoUrl: null,
       newGraphTitle: '',
@@ -267,6 +276,7 @@ export const useStore = create<AppState>()(
       deleteConfirmationId: null,
       editingNodeId: null,
       user: null,
+      versionHistory: [],
       aiProvider: 'gemini',
       aiModel: 'gemini-2.5-flash',
       availableModels: {},
@@ -288,6 +298,7 @@ export const useStore = create<AppState>()(
       setIsNewGraphModalOpen: (isNewGraphModalOpen) => set({ isNewGraphModalOpen }),
       setIsReorderModalOpen: (isReorderModalOpen) => set({ isReorderModalOpen }),
       setIsSEOModalOpen: (isSEOModalOpen) => set({ isSEOModalOpen, seoStatus: 'idle', seoUrl: null }),
+      setIsVersionHistoryModalOpen: (isVersionHistoryModalOpen) => set({ isVersionHistoryModalOpen }),
       setNewGraphTitle: (newGraphTitle) => set({ newGraphTitle }),
       setNewGraphMetaArea: (newGraphMetaArea) => set({ newGraphMetaArea }),
       setDeleteConfirmationId: (deleteConfirmationId) => set({ deleteConfirmationId }),
@@ -299,6 +310,7 @@ export const useStore = create<AppState>()(
         set({ aiProvider, aiModel: models[0]?.id || '' });
       },
       setAiModel: (aiModel) => set({ aiModel }),
+      setVersionHistory: (versionHistory) => set({ versionHistory }),
 
       login: async (email) => {
         set({ isLoading: true, error: null });
@@ -426,14 +438,77 @@ export const useStore = create<AppState>()(
         }
       },
 
+      fetchVersionHistory: async () => {
+        const id = get().currentGraphId;
+        if (!id) return;
+        set({ isLoading: true, historyError: null });
+        try {
+          const history = await knowledgeService.getGraphHistory(id);
+          set({ versionHistory: history });
+        } catch (e: any) {
+          console.error('Failed to fetch version history:', e);
+          set({ historyError: e.message || 'Failed to fetch version history' });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       loadGraph: async (id) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, currentGraphId: id });
         try {
           const data = await knowledgeService.getGraph(id);
-          set({ doc: data, currentGraphId: id, viewMode: 'edit' });
-        } catch (e) {
-          console.error(e);
-          set({ error: 'Failed to load graph' });
+          set({ doc: data, viewMode: 'edit' });
+        } catch (e: any) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          
+          if (errorMsg === 'GRAPH_CORRUPTED' || errorMsg.includes('GRAPH_CORRUPTED')) {
+            console.warn('Load Graph: Graph is corrupted, starting repair...');
+            set({ error: 'Graph data is corrupted. Fetching history for repair...' });
+            try {
+              const history = await knowledgeService.getGraphHistory(id);
+              if (history && history.length > 0) {
+                set({ versionHistory: history });
+                
+                // Try versions from newest to oldest until one works
+                let repairSuccess = false;
+                for (const h of history) {
+                  try {
+                    console.log(`Attempting to recover version ${h.version}...`);
+                    const versionData = await knowledgeService.getGraphVersion(id, h.version);
+                    // Basic validation: must have nodes array
+                    if (versionData && Array.isArray(versionData.nodes)) {
+                      await knowledgeService.saveGraph(id, versionData, true);
+                      set({ 
+                        doc: versionData, 
+                        viewMode: 'edit', 
+                        error: `Graph successfully recovered from version ${h.version}.` 
+                      });
+                      setTimeout(() => set({ error: null }), 5000);
+                      repairSuccess = true;
+                      break;
+                    }
+                  } catch (vErr: any) {
+                    const vErrMsg = vErr instanceof Error ? vErr.message : String(vErr);
+                    console.warn(`Version ${h.version} recovery failed:`, vErrMsg);
+                  }
+                }
+
+                if (!repairSuccess) {
+                  set({ 
+                    error: 'Auto-repair failed. Please select a version manually from the history.',
+                    isVersionHistoryModalOpen: true 
+                  });
+                }
+              } else {
+                set({ error: 'Graph is corrupted and no version history was found to recover from.' });
+              }
+            } catch (historyError) {
+              console.error('Failed to fetch history during repair:', historyError);
+              set({ error: 'Graph is corrupted and version history could not be retrieved.' });
+            }
+          } else {
+            set({ error: errorMsg || 'Failed to load graph' });
+          }
         } finally {
           set({ isLoading: false });
         }
@@ -535,6 +610,24 @@ export const useStore = create<AppState>()(
         }
       },
 
+      restoreVersion: async (version) => {
+        const id = get().currentGraphId;
+        if (!id) return;
+        set({ isLoading: true, error: null });
+        try {
+          const versionData = await knowledgeService.getGraphVersion(id, version);
+          await knowledgeService.saveGraph(id, versionData, true);
+          set({ doc: versionData, isVersionHistoryModalOpen: false });
+          set({ saveStatus: 'success' });
+          setTimeout(() => set({ saveStatus: 'idle' }), 3000);
+        } catch (e) {
+          console.error('Failed to restore version:', e);
+          set({ error: 'Failed to restore version' });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       askAI: async (id, prompt) => {
         set({ isGenerating: true });
         try {
@@ -607,10 +700,10 @@ export const useStore = create<AppState>()(
           }));
 
           // Persist to backend if we have a graph ID
-          const { currentGraphId } = get();
+          const { currentGraphId, saveGraph } = get();
           if (currentGraphId) {
             try {
-              await knowledgeService.updateGraphMetadata(currentGraphId, updatedMetadata);
+              await saveGraph();
             } catch (updateError) {
               console.error('Failed to update graph metadata after AI generation:', updateError);
               // We still return the description so the user can see it in the UI
@@ -680,7 +773,7 @@ export const useStore = create<AppState>()(
             publicationState: 'published'
           };
 
-          await knowledgeService.updateGraphMetadata(currentGraphId, updatedMetadata);
+          await get().saveGraph();
 
           // 3. Update local state
           set((state) => ({

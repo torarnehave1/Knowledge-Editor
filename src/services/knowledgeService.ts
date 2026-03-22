@@ -101,19 +101,46 @@ export const knowledgeService = {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Fetch Graph Error:', response.status, errorText);
+        // If 500 with "map" or "undefined" error, it's likely a corrupted graph (missing nodes/edges)
+        if (response.status === 500 && (errorText.includes('map') || errorText.includes('undefined') || errorText.includes('properties of'))) {
+          throw new Error('GRAPH_CORRUPTED');
+        }
         throw new Error(`Failed to fetch graph (${response.status}): ${errorText || response.statusText}`);
       }
       
-      return await response.json();
-    } catch (e) {
-      console.error('Get Graph Exception:', e);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.warn('Failed to parse graph JSON, likely corrupted:', parseError);
+        throw new Error('GRAPH_CORRUPTED');
+      }
+      
+      // Ensure nodes and edges are arrays to prevent client-side crashes
+      // and handle potentially malformed data from the server
+      if (data) {
+        if (!Array.isArray(data.nodes)) data.nodes = [];
+        if (!Array.isArray(data.edges)) data.edges = [];
+        if (!data.metadata) data.metadata = { title: 'Untitled Graph', description: '' };
+      }
+      
+      return data;
+    } catch (e: any) {
+      if (e.message === 'GRAPH_CORRUPTED') {
+        // Don't log as error, it's a known state handled by the store
+        console.warn('Graph is corrupted (detected in getGraph)');
+      } else {
+        console.error('Get Graph Exception:', e);
+      }
       throw e;
     }
   },
 
   async saveGraph(id: string, doc: KnowledgeDocument, override: boolean = false): Promise<SaveResponse> {
-    const title = doc.metadata?.title || doc.nodes.find(n => n.type === 'title')?.label || 'Untitled Graph';
-    const description = doc.metadata?.description || doc.nodes.find(n => n.type === 'notes')?.label || '';
+    const nodes = doc.nodes || [];
+    const title = doc.metadata?.title || nodes.find(n => n.type === 'title')?.label || 'Untitled Graph';
+    const description = doc.metadata?.description || nodes.find(n => n.type === 'notes')?.label || '';
 
     const payload = {
       id,
@@ -125,19 +152,23 @@ export const knowledgeService = {
           version: doc.metadata?.version || 0,
           metaArea: doc.metadata?.metaArea || ''
         },
-        nodes: doc.nodes.map(node => ({
-          id: node.id,
-          label: node.label,
-          color: node.color,
-          type: node.type,
-          info: node.info || '',
-          bibl: node.bibl || [],
-          visible: node.visible,
-          imageWidth: parseInt(node.imageWidth) || null,
-          imageHeight: parseInt(node.imageHeight) || null,
-          path: node.path,
-          position: { x: 0, y: 0 } // Default position as app is linear but API expects it
-        })),
+        nodes: nodes.map(node => {
+          const w = parseInt(node.imageWidth as any);
+          const h = parseInt(node.imageHeight as any);
+          return {
+            id: node.id,
+            label: node.label,
+            color: node.color,
+            type: node.type,
+            info: node.info || '',
+            bibl: node.bibl || [],
+            visible: node.visible,
+            imageWidth: isNaN(w) ? null : w,
+            imageHeight: isNaN(h) ? null : h,
+            path: node.path,
+            position: { x: 0, y: 0 } // Default position as app is linear but API expects it
+          };
+        }),
         edges: doc.edges || []
       },
       override
@@ -189,6 +220,80 @@ export const knowledgeService = {
     return data.results || [];
   },
 
+  async getGraphHistory(id: string): Promise<{ version: number; timestamp: string }[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/getknowgraphhistory?id=${id}`, {
+        headers: {
+          'X-API-Token': API_TOKEN
+        }
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Fetch History Error:', response.status, errorText);
+        throw new Error(`Failed to fetch graph history (${response.status}): ${errorText}`);
+      }
+      const data = await response.json();
+      console.log('Graph History Data:', data);
+      
+      // Handle the nested structure: { graphId: "...", history: { results: [...] } }
+      if (data && data.history && Array.isArray(data.history.results)) {
+        return data.history.results.map((item: any) => ({
+          ...item,
+          timestamp: item.timestamp || item.updatedAt || item.created_date || new Date().toISOString()
+        }));
+      }
+      
+      // Fallback for other potential formats
+      let results = [];
+      if (Array.isArray(data)) results = data;
+      else if (data && Array.isArray(data.results)) results = data.results;
+      
+      return results.map((item: any) => ({
+        ...item,
+        timestamp: item.timestamp || item.updatedAt || item.created_date || new Date().toISOString()
+      }));
+    } catch (e) {
+      console.error('Get Graph History Exception:', e);
+      throw e;
+    }
+  },
+
+  async getGraphVersion(id: string, version: number): Promise<KnowledgeDocument> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/getknowgraphversion?id=${id}&version=${version}`, {
+        headers: {
+          'X-API-Token': API_TOKEN
+        }
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 500 && (errorText.includes('map') || errorText.includes('undefined') || errorText.includes('properties of'))) {
+          throw new Error('VERSION_CORRUPTED');
+        }
+        throw new Error(`Failed to fetch graph version ${version}: ${errorText}`);
+      }
+      
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        if (data) {
+          if (!Array.isArray(data.nodes)) data.nodes = [];
+          if (!Array.isArray(data.edges)) data.edges = [];
+          if (!data.metadata) data.metadata = { title: 'Untitled Graph', description: '' };
+        }
+        return data;
+      } catch (parseError) {
+        console.warn(`Failed to parse graph version ${version} JSON:`, parseError);
+        throw new Error('VERSION_CORRUPTED');
+      }
+    } catch (e: any) {
+      if (e.message !== 'VERSION_CORRUPTED') {
+        console.error(`Get Graph Version ${version} Exception:`, e);
+      }
+      throw e;
+    }
+  },
+
   async restoreGraph(trashId: string): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/restoreGraph`, {
       method: 'POST',
@@ -213,37 +318,5 @@ export const knowledgeService = {
     });
     if (!response.ok) throw new Error('Failed to generate SEO page');
     return await response.json();
-  },
-
-  async updateGraphMetadata(id: string, metadata: any): Promise<boolean> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/updateknowgraph`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Token': API_TOKEN
-        },
-        body: JSON.stringify({ id, graphData: { metadata } })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Update Graph Metadata Error:', response.status, errorText);
-        throw new Error(`Failed to update graph metadata: ${errorText || response.statusText}`);
-      }
-
-      // Some endpoints return plain text "OK" or similar, handle that
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        return data.success || true;
-      } else {
-        const text = await response.text();
-        return text.toLowerCase().includes('ok') || text.toLowerCase().includes('success') || true;
-      }
-    } catch (e) {
-      console.error('Update Graph Metadata Exception:', e);
-      throw e;
-    }
   }
 };
