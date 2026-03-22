@@ -4,13 +4,16 @@ import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { Node, NodeType } from './types';
+import { Node, NodeType, User } from './types';
 import { VALID_NODE_TYPES } from './constants';
+import { EcosystemNav } from 'vegvisr-ui-kit';
 import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
 import ReorderModal from './components/ReorderModal';
+import { Login } from './components/Login';
 import { useStore } from './store/useStore';
+import { LogOut } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -63,7 +66,10 @@ export default function App() {
     moveNode,
     setNodes,
     saveNode,
-    deleteNode
+    deleteNode,
+    user,
+    logout,
+    checkAuth
   } = useStore();
 
   const getMetaArea = (graph: any): string => {
@@ -74,6 +80,10 @@ export default function App() {
     }
     return String(area || '');
   };
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   useEffect(() => {
     if (viewMode === 'json') {
@@ -111,11 +121,17 @@ export default function App() {
 
   const editingNode = doc.nodes.find(n => n.id === editingNodeId);
 
-  return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
-      <Sidebar />
+  if (!user) {
+    return <Login />;
+  }
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+  return (
+    <div className="flex flex-col h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
+      <EcosystemNav className="flex-shrink-0 border-b border-slate-800 bg-slate-900 px-4 py-2 text-slate-100 z-50" />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+
+        <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-8 bg-white dark:bg-zinc-950 z-10">
           <div className="flex items-center gap-4">
             <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -164,6 +180,20 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex items-center gap-3 mr-2 pr-4 border-r border-zinc-200 dark:border-zinc-800">
+                <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium hidden sm:inline">
+                  {user.email}
+                </span>
+                <button
+                  onClick={logout}
+                  className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
+                  title="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            )}
             {viewMode === 'graphs' && currentGraphId && (
               <button 
                 onClick={() => setViewMode('edit')}
@@ -740,6 +770,7 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

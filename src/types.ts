@@ -1,4 +1,11 @@
 
+export interface User {
+  email: string;
+  role: string;
+  user_id: string;
+  emailVerificationToken?: string;
+}
+
 export type NodeType = string;
 
 export interface Commentary {

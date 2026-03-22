@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { Node, KnowledgeDocument, NodeType, GraphListItem } from '../types';
+import { Node, KnowledgeDocument, NodeType, GraphListItem, User } from '../types';
 import { knowledgeService, MetaAreaItem } from '../services/knowledgeService';
 import { askGemini } from '../services/geminiService';
 
@@ -181,6 +181,7 @@ interface AppState {
   newGraphMetaArea: string;
   deleteConfirmationId: string | null;
   editingNodeId: string | null;
+  user: User | null;
 
   // Actions
   setDoc: (doc: KnowledgeDocument | ((prev: KnowledgeDocument) => KnowledgeDocument)) => void;
@@ -197,6 +198,12 @@ interface AppState {
   setNewGraphMetaArea: (area: string) => void;
   setDeleteConfirmationId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void;
+  setUser: (user: User | null) => void;
+
+  // Auth Actions
+  login: (email: string) => Promise<void>;
+  logout: () => void;
+  checkAuth: () => Promise<void>;
 
   // Async Actions
   fetchGraphs: () => Promise<void>;
@@ -240,6 +247,7 @@ export const useStore = create<AppState>()(
       newGraphMetaArea: 'General',
       deleteConfirmationId: null,
       editingNodeId: null,
+      user: null,
 
       setDoc: (updater) => {
         if (typeof updater === 'function') {
@@ -261,6 +269,81 @@ export const useStore = create<AppState>()(
       setNewGraphMetaArea: (newGraphMetaArea) => set({ newGraphMetaArea }),
       setDeleteConfirmationId: (deleteConfirmationId) => set({ deleteConfirmationId }),
       setEditingNodeId: (editingNodeId) => set({ editingNodeId }),
+      setUser: (user) => set({ user }),
+
+      login: async (email) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('https://cookie.vegvisr.org/login/magic/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, redirectUrl: window.location.href }),
+          });
+          if (!response.ok) throw new Error('Failed to send magic link');
+        } catch (e) {
+          console.error(e);
+          set({ error: 'Failed to send magic link' });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      logout: () => {
+        localStorage.removeItem('user');
+        set({ user: null });
+      },
+
+      checkAuth: async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const magicToken = urlParams.get('magic');
+
+        if (magicToken) {
+          set({ isLoading: true });
+          try {
+            const verifyRes = await fetch(`https://cookie.vegvisr.org/login/magic/verify?token=${magicToken}`);
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success && verifyData.email) {
+              const email = verifyData.email;
+              
+              const [roleRes, userDataRes] = await Promise.all([
+                fetch(`https://dashboard.vegvisr.org/get-role?email=${email}`),
+                fetch(`https://dashboard.vegvisr.org/userdata?email=${email}`)
+              ]);
+
+              const roleData = await roleRes.json();
+              const userData = await userDataRes.json();
+
+              const user: User = {
+                email,
+                role: roleData.role,
+                user_id: userData.user_id,
+                emailVerificationToken: magicToken
+              };
+
+              localStorage.setItem('user', JSON.stringify(user));
+              set({ user });
+              
+              // Clean URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch (e) {
+            console.error('Auth verification failed:', e);
+            set({ error: 'Authentication failed' });
+          } finally {
+            set({ isLoading: false });
+          }
+        } else {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              set({ user: JSON.parse(storedUser) });
+            } catch (e) {
+              localStorage.removeItem('user');
+            }
+          }
+        }
+      },
 
       fetchGraphs: async () => {
         set({ isLoading: true });
