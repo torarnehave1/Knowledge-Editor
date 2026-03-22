@@ -1,7 +1,14 @@
 
-import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye } from 'lucide-react';
+import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles } from 'lucide-react';
 import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
+import { useState } from 'react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 const nodeTypes: { type: NodeType; label: string; icon: any; color: string }[] = [
   { type: 'fulltext', label: 'Full Text', icon: FileText, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
@@ -15,7 +22,19 @@ const nodeTypes: { type: NodeType; label: string; icon: any; color: string }[] =
 ];
 
 export default function Sidebar() {
-  const { viewMode, setViewMode, setIsNewGraphModalOpen, addNode } = useStore();
+  const { 
+    viewMode, 
+    setViewMode, 
+    setIsNewGraphModalOpen, 
+    addNode,
+    aiProvider,
+    setAiProvider,
+    aiModel,
+    setAiModel,
+    availableModels
+  } = useStore();
+
+  const [showAiSettings, setShowAiSettings] = useState(false);
 
   const isPortfolio = viewMode === 'graphs';
 
@@ -44,6 +63,63 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {!isPortfolio && (
           <>
+            <div>
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">AI Assistant</h2>
+                <button 
+                  onClick={() => setShowAiSettings(!showAiSettings)}
+                  className={cn(
+                    "p-1 rounded-md transition-colors",
+                    showAiSettings ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  )}
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
+
+              {showAiSettings && (
+                <div className="mx-2 mb-4 p-3 bg-zinc-100 dark:bg-zinc-900 rounded-xl space-y-3 border border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-top-2">
+                  <div>
+                    <label className="block text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Provider</label>
+                    <select 
+                      value={aiProvider}
+                      onChange={(e) => setAiProvider(e.target.value)}
+                      className="w-full bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold py-1.5 px-2 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {Object.keys(availableModels).length > 0 ? (
+                        Object.keys(availableModels).map(p => (
+                          <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                        ))
+                      ) : (
+                        <option value="gemini">Gemini</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Model</label>
+                    <select 
+                      value={aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                      className="w-full bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold py-1.5 px-2 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    >
+                      {(availableModels[aiProvider] || []).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="px-2 mb-6">
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50">
+                  <Sparkles size={14} className="text-indigo-500" />
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase truncate">
+                    {(availableModels[aiProvider] || []).find(m => m.id === aiModel)?.name || aiModel || 'Select Model'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div>
               <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-4 px-2">Add Section</h2>
               <div className="grid grid-cols-1 gap-2">

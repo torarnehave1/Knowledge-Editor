@@ -2,7 +2,10 @@
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
-const API_TOKEN = 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
+const API_TOKEN_RAW = import.meta.env.VITE_KNOWLEDGE_API_TOKEN;
+const API_TOKEN = (API_TOKEN_RAW && API_TOKEN_RAW !== "undefined") 
+  ? API_TOKEN_RAW 
+  : 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
 
 export interface MetaAreaItem {
   name: string;
@@ -88,13 +91,24 @@ export const knowledgeService = {
   },
 
   async getGraph(id: string): Promise<KnowledgeDocument> {
-    const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${id}`, {
-      headers: {
-        'X-API-Token': API_TOKEN
+    try {
+      const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${id}`, {
+        headers: {
+          'X-API-Token': API_TOKEN
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Fetch Graph Error:', response.status, errorText);
+        throw new Error(`Failed to fetch graph (${response.status}): ${errorText || response.statusText}`);
       }
-    });
-    if (!response.ok) throw new Error('Failed to fetch graph');
-    return await response.json();
+      
+      return await response.json();
+    } catch (e) {
+      console.error('Get Graph Exception:', e);
+      throw e;
+    }
   },
 
   async saveGraph(id: string, doc: KnowledgeDocument, override: boolean = false): Promise<SaveResponse> {
@@ -187,5 +201,49 @@ export const knowledgeService = {
     if (!response.ok) throw new Error('Failed to restore graph');
     const data = await response.json();
     return data.success || true;
+  },
+
+  async generateSEOPage(payload: any): Promise<{ success: boolean; url: string }> {
+    const response = await fetch('https://seo.vegvisr.org/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('Failed to generate SEO page');
+    return await response.json();
+  },
+
+  async updateGraphMetadata(id: string, metadata: any): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/updateknowgraph`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Token': API_TOKEN
+        },
+        body: JSON.stringify({ id, graphData: { metadata } })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Update Graph Metadata Error:', response.status, errorText);
+        throw new Error(`Failed to update graph metadata: ${errorText || response.statusText}`);
+      }
+
+      // Some endpoints return plain text "OK" or similar, handle that
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        return data.success || true;
+      } else {
+        const text = await response.text();
+        return text.toLowerCase().includes('ok') || text.toLowerCase().includes('success') || true;
+      }
+    } catch (e) {
+      console.error('Update Graph Metadata Exception:', e);
+      throw e;
+    }
   }
 };

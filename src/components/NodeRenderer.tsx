@@ -89,22 +89,22 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     });
 
     // Handle [QUOTE | Cited='...']...[END QUOTE]
-    processed = processed.replace(/\[QUOTE \| Cited='(.*?)'\]([\s\S]*?)\[END QUOTE\]/g, (_, cited, text) => {
-      return `<blockquote class="border-l-4 border-indigo-500 pl-4 my-4 italic text-gray-700 dark:text-gray-300">
-        ${text}
-        <cite class="block mt-2 text-sm font-semibold text-gray-500">— ${cited}</cite>
+    processed = processed.replace(/\[QUOTE\s*\|\s*Cited\s*=\s*['"]?(.*?)['"]?\]([\s\S]*?)\[END QUOTE\]/gi, (_, cited, text) => {
+      return `<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden">
+        <div class="mb-3 leading-relaxed break-words">${text}</div>
+        <cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite>
       </blockquote>`;
     });
 
     // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
-    processed = processed.replace(/\[SECTION \| background-color:'(.*?)'; color:'(.*?)'\]([\s\S]*?)\[END SECTION\]/g, (_, bgColor, color, text) => {
-      return `<div class="p-6 my-4 rounded-xl shadow-sm" style="background-color: ${bgColor}; color: ${color};">
-        ${text}
+    processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
+      return `<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};">
+        <div class="break-words">${text}</div>
       </div>`;
     });
 
     // Handle [FANCY | font-size:...; color:...; background-image:url('...')]...[END FANCY]
-    processed = processed.replace(/\[FANCY \| ([\s\S]*?)\]([\s\S]*?)\[END FANCY\]/g, (_, styles, text) => {
+    processed = processed.replace(/\[FANCY\s*\|\s*([\s\S]*?)\]([\s\S]*?)\[END FANCY\]/gi, (_, styles, text) => {
       const styleObj: Record<string, string> = {};
       styles.split(';').forEach((s: string) => {
         const trimmed = s.trim();
@@ -113,7 +113,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         const firstColonIndex = trimmed.indexOf(':');
         if (firstColonIndex === -1) return;
         
-        const key = trimmed.substring(0, firstColonIndex).trim();
+        const key = trimmed.substring(0, firstColonIndex).trim().toLowerCase();
         const value = trimmed.substring(firstColonIndex + 1).trim();
         
         if (key && value) {
@@ -124,9 +124,12 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
       const styleString = Object.entries(styleObj).map(([k, v]) => `${k.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}: ${v}`).join('; ');
 
-      return `<div class="p-8 my-6 rounded-2xl bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[300px]" style="${styleString}">
-        <div class="bg-black/30 backdrop-blur-sm p-6 rounded-xl">
-          ${text}
+      return `<div class="p-12 my-10 rounded-[2.5rem] bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[500px] relative overflow-hidden shadow-2xl border border-white/10" style="${styleString}">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
+        <div class="relative z-10 w-full max-w-4xl mx-auto p-12 rounded-[2rem] prose-invert drop-shadow-2xl">
+          <div class="text-white break-words overflow-wrap-anywhere">
+            ${text}
+          </div>
         </div>
       </div>`;
     });

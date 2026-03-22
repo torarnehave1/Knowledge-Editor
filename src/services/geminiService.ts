@@ -1,47 +1,99 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+const VEGVISR_API_URL = "https://api.vegvisr.org/worker-ai/chat";
+const VEGVISR_API_TOKEN_RAW = import.meta.env.VITE_VEGVISR_API_TOKEN;
+const VEGVISR_API_TOKEN = (VEGVISR_API_TOKEN_RAW && VEGVISR_API_TOKEN_RAW !== "undefined") 
+  ? VEGVISR_API_TOKEN_RAW 
+  : "gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
-export async function askGemini(prompt: string, currentContent?: string | null) {
-  const systemInstruction = `
-    You are an expert full-stack developer and content creator for a "Knowledge Editor" application.
-    The application uses a specific JSON format for sections.
-    You can generate content in Markdown and HTML.
+export async function askGemini(prompt: string, currentContent?: string | null, provider: string = "gemini", model?: string, customSystem?: string) {
+  const defaultSystem = `
+    You are a Knowledge Graph Assistant. Your goal is to help users build and refine their knowledge graphs.
     
-    For HTML sections:
-    - Return a complete, valid HTML5 document starting with <!DOCTYPE html>.
-    - Use modern CSS (Tailwind via CDN or Bootstrap if requested).
-    - Ensure the code is responsive and accessible.
-    - If the user asks for a specific library (Three.js, D3.js, etc.), include the necessary CDN scripts.
-    - Focus on high-quality, interactive components.
+    When generating content for a node, use standard Markdown.
     
-    For standard sections, you can use special tags:
-    - [FANCY | font-size:18.5em; color:#FFFFFF; background-image:url('...')]...[END FANCY] for hero sections.
-    - [SECTION | background-color:'#...'; color:'#...']...[END SECTION] for styled blocks.
-    - [QUOTE | Cited='...']...[END QUOTE] for blockquotes.
+    CRITICAL: You MUST use these custom tags for special formatting in 'fulltext' nodes:
+    1. [SECTION | background-color:#HEX; color:#HEX] ... content ... [END SECTION]
+       - Use this for highlighting blocks of text.
+       - Example: [SECTION | background-color:#F3F4F6; color:#1F2937] Important summary here. [END SECTION]
+    
+    2. [QUOTE | Cited='Author Name'] ... quote text ... [END QUOTE]
+       - Use this for famous quotes or citations.
+       - Example: [QUOTE | Cited='Albert Einstein'] Imagination is more important than knowledge. [END QUOTE]
+    
+    3. [FANCY | background-image:url('https://picsum.photos/seed/keyword/1920/1080'); color:white] ... content ... [END FANCY]
+       - Use this for high-impact hero sections or visual breaks.
+       - ALWAYS include a background-image from picsum.photos.
+       - ALWAYS use 'color:white' for text on these sections as they have a dark overlay.
+       - Example: [FANCY | background-image:url('https://picsum.photos/seed/cosmos/1920/1080'); color:white] # The Infinite Universe [END FANCY]
+    
+    4. [COMMENTARY] ... text ... [END COMMENTARY]
+       - Use for side notes or meta-commentary.
+    
+    5. [YOUTUBE] VIDEO_ID [END YOUTUBE]
+       - Use for embedding videos.
+    
+    Guidelines:
+    - Be concise but informative.
+    - Use headings (##, ###) to structure long content.
+    - Ensure high contrast for all text.
+    - If the user asks to "make it fancy", use the [FANCY] tag.
+    - If the user asks for a "quote", use the [QUOTE] tag.
+    - If the user asks for a "section", use the [SECTION] tag.
     
     Current content context:
     ${currentContent || 'None'}
     
-    User request:
-    ${prompt}
-    
     Return ONLY the content for the section. Do not include explanations.
   `;
 
+  const systemInstruction = customSystem || defaultSystem;
+
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        systemInstruction,
+    const body: any = {
+      provider,
+      system: systemInstruction,
+      messages: [
+        { role: "user", content: prompt }
+      ]
+    };
+
+    // Only include model if it's a non-empty string
+    if (model && model.trim() !== '') {
+      body.model = model;
+    }
+
+    const response = await fetch(VEGVISR_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Token': VEGVISR_API_TOKEN,
       },
+      body: JSON.stringify(body)
     });
 
-    return response.text || '';
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Worker AI API Error:', response.status, errorText);
+      throw new Error(`API Error: ${response.status} ${errorText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Handle different response formats
+    let content = data.content || 
+                  data.message?.content || 
+                  data.choices?.[0]?.message?.content || 
+                  data.result || 
+                  '';
+    
+    // If content is an array (common in Anthropic/Claude responses)
+    if (Array.isArray(content)) {
+      content = content.map((part: any) => part.text || '').join('');
+    }
+    
+    return content;
   } catch (error) {
-    console.error('Gemini Error:', error);
-    return 'Error generating content. Please try again.';
+    console.error('Worker AI Error:', error);
+    throw error;
   }
 }

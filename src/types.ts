@@ -36,6 +36,11 @@ export interface GraphMetadata {
   createdBy?: string;
   version?: number;
   metaArea?: string;
+  seoSlug?: string;
+  seoDescription?: string;
+  seoOgImage?: string;
+  seoKeywords?: string;
+  publicationState?: 'draft' | 'published';
 }
 
 export interface GraphListItem {

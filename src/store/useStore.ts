@@ -177,11 +177,19 @@ interface AppState {
   error: string | null;
   isNewGraphModalOpen: boolean;
   isReorderModalOpen: boolean;
+  isSEOModalOpen: boolean;
+  seoStatus: 'idle' | 'generating' | 'success' | 'error';
+  seoUrl: string | null;
   newGraphTitle: string;
   newGraphMetaArea: string;
   deleteConfirmationId: string | null;
   editingNodeId: string | null;
   user: User | null;
+  
+  // AI Settings
+  aiProvider: string;
+  aiModel: string;
+  availableModels: Record<string, { id: string; name: string; description?: string }[]>;
 
   // Actions
   setDoc: (doc: KnowledgeDocument | ((prev: KnowledgeDocument) => KnowledgeDocument)) => void;
@@ -194,11 +202,14 @@ interface AppState {
   setError: (error: string | null) => void;
   setIsNewGraphModalOpen: (isOpen: boolean) => void;
   setIsReorderModalOpen: (isOpen: boolean) => void;
+  setIsSEOModalOpen: (isOpen: boolean) => void;
   setNewGraphTitle: (title: string) => void;
   setNewGraphMetaArea: (area: string) => void;
   setDeleteConfirmationId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void;
   setUser: (user: User | null) => void;
+  setAiProvider: (provider: string) => void;
+  setAiModel: (model: string) => void;
 
   // Auth Actions
   login: (email: string) => Promise<void>;
@@ -215,6 +226,10 @@ interface AppState {
   deleteGraph: () => Promise<void>;
   restoreGraph: (trashId: string) => Promise<void>;
   askAI: (id: string, prompt: string) => Promise<void>;
+  generateSEODescription: (title: string) => Promise<string>;
+  generateSEOKeywords: (title: string) => Promise<string>;
+  publishSEOPage: (seoData: { slug: string; title: string; description: string; ogImage: string; keywords: string }) => Promise<void>;
+  fetchAvailableModels: () => Promise<void>;
   
   // Node Operations
   addNode: (type: NodeType) => void;
@@ -244,11 +259,17 @@ export const useStore = create<AppState>()(
       error: null,
       isNewGraphModalOpen: false,
       isReorderModalOpen: false,
+      isSEOModalOpen: false,
+      seoStatus: 'idle',
+      seoUrl: null,
       newGraphTitle: '',
       newGraphMetaArea: 'General',
       deleteConfirmationId: null,
       editingNodeId: null,
       user: null,
+      aiProvider: 'gemini',
+      aiModel: 'gemini-2.5-flash',
+      availableModels: {},
 
       setDoc: (updater) => {
         if (typeof updater === 'function') {
@@ -266,11 +287,18 @@ export const useStore = create<AppState>()(
       setError: (error) => set({ error }),
       setIsNewGraphModalOpen: (isNewGraphModalOpen) => set({ isNewGraphModalOpen }),
       setIsReorderModalOpen: (isReorderModalOpen) => set({ isReorderModalOpen }),
+      setIsSEOModalOpen: (isSEOModalOpen) => set({ isSEOModalOpen, seoStatus: 'idle', seoUrl: null }),
       setNewGraphTitle: (newGraphTitle) => set({ newGraphTitle }),
       setNewGraphMetaArea: (newGraphMetaArea) => set({ newGraphMetaArea }),
       setDeleteConfirmationId: (deleteConfirmationId) => set({ deleteConfirmationId }),
       setEditingNodeId: (editingNodeId) => set({ editingNodeId }),
       setUser: (user) => set({ user }),
+      setAiProvider: (aiProvider) => {
+        const { availableModels } = get();
+        const models = availableModels[aiProvider] || [];
+        set({ aiProvider, aiModel: models[0]?.id || '' });
+      },
+      setAiModel: (aiModel) => set({ aiModel }),
 
       login: async (email) => {
         set({ isLoading: true, error: null });
@@ -510,8 +538,9 @@ export const useStore = create<AppState>()(
       askAI: async (id, prompt) => {
         set({ isGenerating: true });
         try {
+          const { aiProvider, aiModel } = get();
           const node = get().doc.nodes.find(n => n.id === id);
-          const result = await askGemini(prompt, node?.info);
+          const result = await askGemini(prompt, node?.info, aiProvider, aiModel);
           if (node) {
             set((state) => ({
               doc: {
@@ -520,11 +549,193 @@ export const useStore = create<AppState>()(
               }
             }));
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error(e);
-          set({ error: 'AI generation failed' });
+          set({ error: e.message || 'AI generation failed' });
         } finally {
           set({ isGenerating: false });
+        }
+      },
+
+      generateSEODescription: async (title) => {
+        const { doc } = get();
+        // Extract some content from nodes for better context
+        const nodeContent = doc.nodes
+          .filter(n => n.visible && n.info)
+          .slice(0, 5)
+          .map(n => n.info)
+          .join('\n')
+          .substring(0, 1000);
+
+        const prompt = `Generate a compelling SEO meta description (max 160 characters) for a knowledge graph titled: "${title}". 
+        
+        Here is some content from the graph for context:
+        ${nodeContent}
+        
+        Focus on keywords and engagement. Return ONLY the description text.`;
+        
+        const systemPrompt = "You are an SEO expert. Your goal is to write high-converting meta descriptions that improve CTR and search rankings. Be concise, use active voice, and include relevant keywords.";
+
+        try {
+          // Use grok provider and grok-3 model as requested
+          let result: string;
+          try {
+            result = await askGemini(prompt, null, 'grok', 'grok-3', systemPrompt);
+          } catch (aiError) {
+            console.warn('Grok-3 failed, falling back to Grok-2:', aiError);
+            try {
+              result = await askGemini(prompt, null, 'grok', 'grok-2', systemPrompt);
+            } catch (aiError2) {
+              console.warn('Grok-2 failed, falling back to Gemini:', aiError2);
+              result = await askGemini(prompt, null, 'gemini', 'gemini-2.5-flash', systemPrompt);
+            }
+          }
+          
+          const cleanDesc = result.trim().replace(/^["']|["']$/g, '');
+          
+          // Update the doc metadata with the new description
+          const updatedMetadata = {
+            ...get().doc.metadata,
+            seoDescription: cleanDesc
+          };
+
+          set((state) => ({
+            doc: {
+              ...state.doc,
+              metadata: updatedMetadata as any
+            }
+          }));
+
+          // Persist to backend if we have a graph ID
+          const { currentGraphId } = get();
+          if (currentGraphId) {
+            try {
+              await knowledgeService.updateGraphMetadata(currentGraphId, updatedMetadata);
+            } catch (updateError) {
+              console.error('Failed to update graph metadata after AI generation:', updateError);
+              // We still return the description so the user can see it in the UI
+            }
+          }
+          
+          return cleanDesc;
+        } catch (e: any) {
+          console.error('Failed to generate SEO description:', e);
+          throw new Error(`Failed to generate SEO description: ${e.message}`);
+        }
+      },
+
+      generateSEOKeywords: async (title) => {
+        const { doc } = get();
+        const nodeContent = doc.nodes
+          .filter(n => n.visible && n.label)
+          .slice(0, 10)
+          .map(n => n.label)
+          .join(', ');
+
+        const prompt = `Generate 5-10 relevant SEO keywords (comma-separated) for a knowledge graph titled: "${title}".
+        
+        Key topics in the graph: ${nodeContent}
+        
+        Return ONLY the comma-separated keywords.`;
+        
+        const systemPrompt = "You are an SEO expert. Provide a concise list of high-value, relevant keywords for search engine optimization.";
+
+        try {
+          let result: string;
+          try {
+            result = await askGemini(prompt, null, 'grok', 'grok-3', systemPrompt);
+          } catch (aiError) {
+            result = await askGemini(prompt, null, 'gemini', 'gemini-2.5-flash', systemPrompt);
+          }
+          
+          const cleanKeywords = result.trim().replace(/^["']|["']$/g, '');
+          return cleanKeywords;
+        } catch (e: any) {
+          console.error('Failed to generate SEO keywords:', e);
+          return '';
+        }
+      },
+
+      publishSEOPage: async (seoData) => {
+        const { currentGraphId, doc } = get();
+        if (!currentGraphId) return;
+
+        set({ seoStatus: 'generating' });
+        try {
+          // 1. Generate the static page
+          const payload = {
+            graphId: currentGraphId,
+            ...seoData,
+            graphData: doc
+          };
+          const genResult = await knowledgeService.generateSEOPage(payload);
+
+          // 2. Update graph metadata
+          const updatedMetadata = {
+            ...doc.metadata,
+            seoSlug: seoData.slug,
+            seoDescription: seoData.description,
+            seoOgImage: seoData.ogImage,
+            seoKeywords: seoData.keywords,
+            publicationState: 'published'
+          };
+
+          await knowledgeService.updateGraphMetadata(currentGraphId, updatedMetadata);
+
+          // 3. Update local state
+          set((state) => ({
+            doc: {
+              ...state.doc,
+              metadata: updatedMetadata as any
+            },
+            seoStatus: 'success',
+            seoUrl: genResult.url
+          }));
+        } catch (e: any) {
+          console.error('SEO Publication failed:', e);
+          set({ seoStatus: 'error', error: e.message || 'Failed to publish SEO page' });
+        }
+      },
+
+      fetchAvailableModels: async () => {
+        try {
+          const response = await fetch('https://api.vegvisr.org/worker-ai/models');
+          if (!response.ok) throw new Error('Failed to fetch models');
+          const data = await response.json();
+          const models = data.models || {};
+          set({ availableModels: models });
+          
+          // Set initial model if not set
+          const { aiProvider, aiModel } = get();
+          if (!aiModel && models[aiProvider]) {
+            set({ aiModel: models[aiProvider][0]?.id });
+          }
+        } catch (e) {
+          console.error('Failed to fetch models:', e);
+          // Fallback to some defaults if API fails
+          set({
+            availableModels: {
+              gemini: [
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' }
+              ],
+              openai: [
+                { id: 'gpt-4o', name: 'GPT-4o' },
+                { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+                { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' }
+              ],
+              anthropic: [
+                { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
+                { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+                { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' }
+              ],
+              grok: [
+                { id: 'grok-3', name: 'Grok-3' },
+                { id: 'grok-2', name: 'Grok-2' }
+              ]
+            }
+          });
         }
       },
 
@@ -585,7 +796,9 @@ export const useStore = create<AppState>()(
         viewMode: state.viewMode, 
         selectedMetaArea: state.selectedMetaArea,
         selectedNodeType: state.selectedNodeType,
-        searchQuery: state.searchQuery
+        searchQuery: state.searchQuery,
+        aiProvider: state.aiProvider,
+        aiModel: state.aiModel
       }),
     }
   )

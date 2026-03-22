@@ -83,6 +83,21 @@ export default function NodeEditor() {
   
   const [editedNode, setEditedNode] = useState<Node | null>(node ? { ...node } : null);
   const [aiPrompt, setAiPrompt] = useState('');
+
+  // Sync with store when AI finishes generating
+  useEffect(() => {
+    if (node && !isGenerating) {
+      setEditedNode(prev => {
+        if (!prev) return { ...node };
+        // Only update if the store has a different info (meaning AI updated it)
+        if (prev.info !== node.info) {
+          setAiPrompt(''); // Clear prompt after success
+          return { ...prev, info: node.info, commentaries: node.commentaries };
+        }
+        return prev;
+      });
+    }
+  }, [node, isGenerating]);
   const [commentaryPromptOpen, setCommentaryPromptOpen] = useState(false);
   const [commentaryText, setCommentaryText] = useState('');
   const [selectionRange, setSelectionRange] = useState<{ start: number, end: number } | null>(null);
@@ -375,16 +390,34 @@ export default function NodeEditor() {
               )}
             </div>
           </div>
-          <textarea
-            ref={textareaRef}
-            name="info"
-            value={editedNode.info || ''}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            rows={isHtmlNode ? 20 : 12}
-            className="w-full p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-            placeholder={isHtmlNode ? "<!DOCTYPE html>..." : "Enter content here... (Type '[' for suggestions)"}
-          />
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              name="info"
+              value={editedNode.info || ''}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              rows={isHtmlNode ? 20 : 12}
+              disabled={isGenerating}
+              className={cn(
+                "w-full p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-opacity",
+                isGenerating && "opacity-50"
+              )}
+              placeholder={isHtmlNode ? "<!DOCTYPE html>..." : "Enter content here... (Type '[' for suggestions)"}
+            />
+            {isGenerating && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/10 dark:bg-black/10 backdrop-blur-[1px] rounded-lg">
+                <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-zinc-800 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
+                  </div>
+                  <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest">AI is generating...</span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Floating Suggestions Menu */}
           {showSuggestions && filteredSuggestions.length > 0 && (
@@ -443,9 +476,17 @@ export default function NodeEditor() {
             />
             <button
               onClick={() => askAI(editedNode.id, aiPrompt)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+              disabled={isGenerating || !aiPrompt.trim()}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
-              Ask
+              {isGenerating ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Ask'
+              )}
             </button>
           </div>
           <p className="text-[10px] text-indigo-500 dark:text-indigo-400 leading-relaxed">

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw } from 'lucide-react';
+import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
 import ReorderModal from './components/ReorderModal';
+import SEOModal from './components/SEOModal';
 import { Login } from './components/Login';
 import { useStore } from './store/useStore';
 import { LogOut } from 'lucide-react';
@@ -42,6 +43,8 @@ export default function App() {
     setIsNewGraphModalOpen,
     isReorderModalOpen,
     setIsReorderModalOpen,
+    isSEOModalOpen,
+    setIsSEOModalOpen,
     newGraphTitle,
     setNewGraphTitle,
     newGraphMetaArea,
@@ -69,7 +72,8 @@ export default function App() {
     deleteNode,
     user,
     logout,
-    checkAuth
+    checkAuth,
+    fetchAvailableModels
   } = useStore();
 
   const getMetaArea = (graph: any): string => {
@@ -83,7 +87,8 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
-  }, [checkAuth]);
+    fetchAvailableModels();
+  }, [checkAuth, fetchAvailableModels]);
 
   useEffect(() => {
     if (viewMode === 'json') {
@@ -215,6 +220,20 @@ export default function App() {
               >
                 <RotateCcw size={18} className="rotate-180" />
                 Reorder Nodes
+              </button>
+            )}
+            {viewMode === 'edit' && currentGraphId && (
+              <button 
+                onClick={() => setIsSEOModalOpen(true)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
+                  isSEOModalOpen 
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                    : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                )}
+              >
+                <Globe size={18} />
+                SEO Page
               </button>
             )}
             <button 
@@ -622,6 +641,9 @@ export default function App() {
 
       {/* Reorder Modal */}
       <ReorderModal />
+
+      {/* SEO Modal */}
+      <SEOModal />
 
       {/* Slide-over Editor */}
       <AnimatePresence>
