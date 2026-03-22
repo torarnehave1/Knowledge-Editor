@@ -1,28 +1,242 @@
 
-import { Node, NodeType } from '../types';
-import { X, Save, Trash2, Wand2, Globe, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { Node, NodeType, Commentary } from '../types';
+import { X, Save, Trash2, Wand2, Globe, ShieldAlert, Eye, MessageSquare, Youtube, Quote, Layout, Sparkles, MessageCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { useStore } from '../store/useStore';
+import getCaretCoordinates from 'textarea-caret';
 
-interface NodeEditorProps {
-  node: Node;
-  onSave: (updatedNode: Node) => void;
-  onDelete: (id: string) => void;
-  onClose: () => void;
-  onAskAI: (id: string, prompt: string) => void;
-  onPublish?: (node: Node) => void;
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, onPublish }: NodeEditorProps) {
-  const [editedNode, setEditedNode] = useState<Node>({ ...node });
+interface TagSuggestion {
+  id: string;
+  label: string;
+  icon: any;
+  template: string;
+  cursorOffset: number; // Where to place the cursor after insertion
+  description: string;
+}
+
+const SUGGESTIONS: TagSuggestion[] = [
+  { 
+    id: 'youtube', 
+    label: 'YOUTUBE', 
+    icon: Youtube, 
+    template: '![YOUTUBE src=]title[END YOUTUBE]', 
+    cursorOffset: 14,
+    description: 'Embed a YouTube video'
+  },
+  { 
+    id: 'commentary', 
+    label: 'COMMENTARY', 
+    icon: MessageCircle, 
+    template: "[COMMENTARY | id='']text[END COMMENTARY]", 
+    cursorOffset: 17,
+    description: 'Add a scholarly footnote'
+  },
+  { 
+    id: 'quote', 
+    label: 'QUOTE', 
+    icon: Quote, 
+    template: "[QUOTE | Cited='']text[END QUOTE]", 
+    cursorOffset: 16,
+    description: 'Styled blockquote with citation'
+  },
+  { 
+    id: 'section', 
+    label: 'SECTION', 
+    icon: Layout, 
+    template: "[SECTION | background-color:''; color:'']text[END SECTION]", 
+    cursorOffset: 27,
+    description: 'Colored background container'
+  },
+  { 
+    id: 'fancy', 
+    label: 'FANCY', 
+    icon: Sparkles, 
+    template: "[FANCY | font-size:; color:; background-image:url('')]text[END FANCY]", 
+    cursorOffset: 47,
+    description: 'Hero section with background image'
+  },
+];
+
+export default function NodeEditor() {
+  const { 
+    editingNodeId, 
+    doc, 
+    setEditingNodeId, 
+    saveNode, 
+    deleteNode, 
+    askAI, 
+    setViewMode, 
+    saveGraph,
+    isGenerating,
+    error: storeError,
+    setError: setStoreError
+  } = useStore();
+
+  const node = doc.nodes.find(n => n.id === editingNodeId);
+  
+  const [editedNode, setEditedNode] = useState<Node | null>(node ? { ...node } : null);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [commentaryPromptOpen, setCommentaryPromptOpen] = useState(false);
+  const [commentaryText, setCommentaryText] = useState('');
+  const [selectionRange, setSelectionRange] = useState<{ start: number, end: number } | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Suggestion Menu State
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionPos, setSuggestionPos] = useState({ top: 0, left: 0 });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [filterText, setFilterText] = useState('');
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showSuggestions) {
+        setShowSuggestions(false);
+      }
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [showSuggestions]);
+
+  if (!node || !editedNode) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setEditedNode(prev => ({ ...prev, [name]: value }));
+    setEditedNode(prev => prev ? ({ ...prev, [name]: value }) : null);
+
+    // Handle Suggestions Trigger
+    if (name === 'info' && textareaRef.current) {
+      const cursor = textareaRef.current.selectionStart;
+      const textBefore = value.substring(0, cursor);
+      
+      // Look for the last '[' or '!['
+      const lastBracket = textBefore.lastIndexOf('[');
+      if (lastBracket !== -1) {
+        const triggerText = textBefore.substring(lastBracket);
+        // Trigger if it starts with '[' or '![' and doesn't have a space
+        if ((triggerText === '[' || triggerText === '![') || (triggerText.startsWith('[') && !triggerText.includes(' '))) {
+          const coords = getCaretCoordinates(textareaRef.current, cursor);
+          setSuggestionPos({ 
+            top: coords.top + 24, // Offset below the line
+            left: coords.left 
+          });
+          setFilterText(triggerText.replace(/^!\[|^\[/, '').toUpperCase());
+          setShowSuggestions(true);
+          setSelectedIndex(0);
+        } else {
+          setShowSuggestions(false);
+        }
+      } else {
+        setShowSuggestions(false);
+      }
+    }
+  };
+
+  const filteredSuggestions = SUGGESTIONS.filter(s => s.label.includes(filterText));
+
+  const insertSuggestion = (suggestion: TagSuggestion) => {
+    if (!textareaRef.current) return;
+    const cursor = textareaRef.current.selectionStart;
+    const textBefore = editedNode.info?.substring(0, cursor) || '';
+    const textAfter = editedNode.info?.substring(cursor) || '';
+    
+    // Find where the trigger started (could be '[' or '![')
+    const lastBracket = textBefore.lastIndexOf('[');
+    let triggerStart = lastBracket;
+    if (lastBracket > 0 && textBefore[lastBracket - 1] === '!') {
+      triggerStart = lastBracket - 1;
+    }
+    
+    const prefix = textBefore.substring(0, triggerStart);
+    const newInfo = prefix + suggestion.template + textAfter;
+    
+    setEditedNode(prev => prev ? ({ ...prev, info: newInfo }) : null);
+    setShowSuggestions(false);
+
+    // Focus and place cursor inside the template
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = triggerStart + suggestion.cursorOffset;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showSuggestions) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev + 1) % filteredSuggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        if (filteredSuggestions[selectedIndex]) {
+          insertSuggestion(filteredSuggestions[selectedIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+      }
+    }
   };
 
   const handleFixErrors = () => {
-    onAskAI(editedNode.id, "Analyze this HTML code, fix any syntax errors, ensure it is responsive, and follow best practices. Return only the corrected code.");
+    askAI(editedNode.id, "Analyze this HTML code, fix any syntax errors, ensure it is responsive, and follow best practices. Return only the corrected code.");
+  };
+
+  const handleAddCommentary = () => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const selectedText = editedNode.info?.substring(start, end);
+
+    if (!selectedText) {
+      setLocalError("Please select some text to add a commentary.");
+      setTimeout(() => setLocalError(null), 3000);
+      return;
+    }
+
+    setSelectionRange({ start, end });
+    setCommentaryPromptOpen(true);
+  };
+
+  const confirmAddCommentary = () => {
+    if (!selectionRange || !commentaryText.trim()) return;
+    
+    const { start, end } = selectionRange;
+    const selectedText = editedNode.info?.substring(start, end);
+    const commentaryId = uuidv4();
+    const newCommentary: Commentary = {
+      id: commentaryId,
+      text: commentaryText,
+      author: "Tor Arne Håve",
+      initials: "TAH",
+      createdAt: new Date().toISOString()
+    };
+
+    const newInfo = 
+      (editedNode.info?.substring(0, start) || '') + 
+      `[COMMENTARY | id='${commentaryId}']${selectedText}[END COMMENTARY]` + 
+      (editedNode.info?.substring(end) || '');
+
+    setEditedNode(prev => prev ? ({
+      ...prev,
+      info: newInfo,
+      commentaries: [...(prev.commentaries || []), newCommentary]
+    }) : null);
+
+    setCommentaryPromptOpen(false);
+    setCommentaryText('');
+    setSelectionRange(null);
   };
 
   const isHtmlNode = editedNode.type === 'html-node';
@@ -37,8 +251,13 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
               Advanced HTML
             </span>
           )}
+          {(localError || storeError) && (
+            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-red-200 dark:border-red-800 animate-pulse">
+              {localError || storeError}
+            </span>
+          )}
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
+        <button onClick={() => setEditingNodeId(null)} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
           <X size={20} />
         </button>
       </div>
@@ -68,19 +287,41 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
               <option value="title">Title</option>
               <option value="info">Info</option>
               <option value="image">Image</option>
-              <option value="youtube">YouTube</option>
+              <option value="youtube-video">YouTube Video</option>
               <option value="REG">Registration</option>
               <option value="html-node">HTML Section</option>
             </select>
           </div>
         </div>
 
+        {editedNode.type === 'youtube-video' && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">YouTube URL</label>
+            <input
+              type="text"
+              name="path"
+              value={editedNode.path || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditedNode(prev => prev ? ({ 
+                  ...prev, 
+                  path: val,
+                  bibl: [val] // Sync bibl with path as per guide
+                }) : null);
+              }}
+              placeholder="https://youtu.be/..."
+              className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <p className="text-[10px] text-zinc-500">Paste the full YouTube URL here (e.g., https://youtu.be/dQw4w9WgXcQ)</p>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 p-4 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800">
           <input
             type="checkbox"
             id="visible"
             checked={editedNode.visible}
-            onChange={(e) => setEditedNode(prev => ({ ...prev, visible: e.target.checked }))}
+            onChange={(e) => setEditedNode(prev => prev ? ({ ...prev, visible: e.target.checked }) : null)}
             className="w-5 h-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
           />
           <label htmlFor="visible" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -113,24 +354,78 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
               {isHtmlNode ? 'HTML Source Code' : 'Content (Markdown/HTML)'}
             </label>
-            {isHtmlNode && (
-              <button
-                onClick={handleFixErrors}
-                className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-colors"
-              >
-                <ShieldAlert size={12} />
-                AI Fix Errors
-              </button>
-            )}
+            <div className="flex gap-2">
+              {!isHtmlNode && (
+                <button
+                  onClick={handleAddCommentary}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+                >
+                  <MessageSquare size={12} />
+                  Add Commentary
+                </button>
+              )}
+              {isHtmlNode && (
+                <button
+                  onClick={handleFixErrors}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                  <ShieldAlert size={12} />
+                  AI Fix Errors
+                </button>
+              )}
+            </div>
           </div>
           <textarea
+            ref={textareaRef}
             name="info"
             value={editedNode.info || ''}
             onChange={handleChange}
+            onKeyDown={handleKeyDown}
             rows={isHtmlNode ? 20 : 12}
             className="w-full p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-            placeholder={isHtmlNode ? "<!DOCTYPE html>..." : "Enter content here..."}
+            placeholder={isHtmlNode ? "<!DOCTYPE html>..." : "Enter content here... (Type '[' for suggestions)"}
           />
+
+          {/* Floating Suggestions Menu */}
+          {showSuggestions && filteredSuggestions.length > 0 && (
+            <div 
+              className="fixed z-[100] w-64 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden"
+              style={{ 
+                top: textareaRef.current ? textareaRef.current.getBoundingClientRect().top + suggestionPos.top : 0,
+                left: textareaRef.current ? textareaRef.current.getBoundingClientRect().left + suggestionPos.left : 0
+              }}
+            >
+              <div className="p-2 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Insert Tag</p>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {filteredSuggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion.id}
+                    onClick={() => insertSuggestion(suggestion)}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 text-left transition-colors",
+                      index === selectedIndex ? "bg-indigo-50 dark:bg-indigo-900/30" : "hover:bg-zinc-50 dark:hover:bg-zinc-950"
+                    )}
+                  >
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      index === selectedIndex ? "bg-indigo-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                    )}>
+                      <suggestion.icon size={16} />
+                    </div>
+                    <div>
+                      <p className={cn("text-xs font-bold", index === selectedIndex ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-700 dark:text-zinc-300")}>
+                        {suggestion.label}
+                      </p>
+                      <p className="text-[10px] text-zinc-500 line-clamp-1">{suggestion.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/50 space-y-3">
@@ -147,7 +442,7 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
               className="flex-1 p-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-zinc-900 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
-              onClick={() => onAskAI(editedNode.id, aiPrompt)}
+              onClick={() => askAI(editedNode.id, aiPrompt)}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               Ask
@@ -163,16 +458,26 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
 
       <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-between bg-zinc-50 dark:bg-zinc-950">
         <button
-          onClick={() => onDelete(editedNode.id)}
+          onClick={() => deleteNode(editedNode.id)}
           className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-sm font-medium transition-colors"
         >
           <Trash2 size={18} />
           Delete
         </button>
         <div className="flex gap-2">
-          {isHtmlNode && onPublish && (
+          <button
+            onClick={() => {
+              saveNode(editedNode);
+              setViewMode('preview');
+            }}
+            className="flex items-center gap-2 px-4 py-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Eye size={18} />
+            Preview
+          </button>
+          {isHtmlNode && (
             <button
-              onClick={() => onPublish(editedNode)}
+              onClick={() => console.log(`Publishing node ${editedNode.id} to domain...`)}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
               <Globe size={18} />
@@ -180,13 +485,13 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
             </button>
           )}
           <button
-            onClick={onClose}
+            onClick={() => setEditingNodeId(null)}
             className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-sm font-medium transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={() => onSave(editedNode)}
+            onClick={() => saveNode(editedNode)}
             className="flex items-center gap-2 px-6 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             <Save size={18} />
@@ -194,6 +499,42 @@ export default function NodeEditor({ node, onSave, onDelete, onClose, onAskAI, o
           </button>
         </div>
       </div>
+
+      {/* Commentary Prompt Modal */}
+      {commentaryPromptOpen && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-zinc-200 dark:border-zinc-800">
+            <h4 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-widest mb-4">Add Commentary</h4>
+            <textarea
+              autoFocus
+              value={commentaryText}
+              onChange={(e) => setCommentaryText(e.target.value)}
+              placeholder="Enter your scholarly notes..."
+              rows={4}
+              className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  setCommentaryPromptOpen(false);
+                  setCommentaryText('');
+                  setSelectionRange(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmAddCommentary}
+                disabled={!commentaryText.trim()}
+                className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              >
+                Add Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

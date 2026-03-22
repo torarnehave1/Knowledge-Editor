@@ -1,5 +1,13 @@
 
-export type NodeType = 'fulltext' | 'notes' | 'REG' | 'background' | 'title' | 'info' | 'youtube' | 'image' | 'html-node';
+export type NodeType = string;
+
+export interface Commentary {
+  id: string;
+  text: string;
+  author: string;
+  initials: string;
+  createdAt: string;
+}
 
 export interface Node {
   id: string;
@@ -12,9 +20,30 @@ export interface Node {
   imageHeight: string;
   visible: boolean;
   path: string | null;
+  commentaries?: Commentary[];
+}
+
+export interface GraphMetadata {
+  title: string;
+  description?: string;
+  createdBy?: string;
+  version?: number;
+  metaArea?: string;
+}
+
+export interface GraphListItem {
+  id: string;
+  title: string;
+  metaArea?: string;
+  metadata?: any;
+  categories?: string[];
+  nodeTypes?: Record<string, number>;
+  nodeCount?: number;
+  updatedAt?: string;
 }
 
 export interface KnowledgeDocument {
+  metadata?: GraphMetadata;
   nodes: Node[];
   edges: any[];
 }
