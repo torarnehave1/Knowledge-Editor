@@ -204,6 +204,7 @@ interface AppState {
   login: (email: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  bypassLogin: () => void;
 
   // Async Actions
   fetchGraphs: () => Promise<void>;
@@ -291,6 +292,17 @@ export const useStore = create<AppState>()(
       logout: () => {
         localStorage.removeItem('user');
         set({ user: null });
+      },
+
+      bypassLogin: () => {
+        const mockUser: User = {
+          email: 'dev@vegvisr.org',
+          role: 'admin',
+          user_id: 'dev-user-id',
+          emailVerificationToken: 'dev-token'
+        };
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        set({ user: mockUser });
       },
 
       checkAuth: async () => {

@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isSent, setIsSent] = useState(false);
-  const { login, isLoading, error } = useStore();
+  const { login, bypassLogin, isLoading, error } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +26,13 @@ export const Login: React.FC = () => {
         className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl"
       >
         <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 bg-indigo-600/20 rounded-2xl flex items-center justify-center border border-indigo-500/30">
-            <Mail className="w-8 h-8 text-indigo-400" />
+          <div className="w-20 h-20 bg-indigo-600/10 rounded-3xl flex items-center justify-center border border-indigo-500/20 shadow-inner">
+            <img 
+              src="https://favicons.vegvisr.org/favicons/1774176116987-1-1774176120241-512x512.png" 
+              alt="Knowledge Editor Logo" 
+              className="w-14 h-14 rounded-xl shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
           </div>
         </div>
 
@@ -94,6 +99,23 @@ export const Login: React.FC = () => {
               ) : (
                 'Send magic link'
               )}
+            </button>
+
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-zinc-800"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-zinc-900 px-2 text-zinc-500">Development Only</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={bypassLogin}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2 rounded-xl border border-zinc-700 transition-all text-sm"
+            >
+              Bypass Login (Dev)
             </button>
           </form>
         )}

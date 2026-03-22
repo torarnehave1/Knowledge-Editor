@@ -22,7 +22,13 @@ export default function Sidebar() {
   return (
     <div className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex flex-col h-full">
       <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-3 mb-1">
+          <img 
+            src="https://favicons.vegvisr.org/favicons/1774176116987-1-1774176120241-512x512.png" 
+            alt="Logo" 
+            className="w-8 h-8 rounded-lg shadow-sm"
+            referrerPolicy="no-referrer"
+          />
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Knowledge Editor</h1>
         </div>
         <p className="text-xs text-zinc-500 font-medium mb-4">Build structured documents</p>
