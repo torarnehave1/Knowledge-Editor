@@ -421,7 +421,11 @@ export const useStore = create<AppState>()(
           const storedUser = localStorage.getItem('user');
           if (storedUser) {
             try {
-              set({ user: JSON.parse(storedUser) });
+              const user = JSON.parse(storedUser);
+              set({ user });
+              if (user.emailVerificationToken) {
+                localStorage.setItem('emailVerificationToken', user.emailVerificationToken);
+              }
             } catch (e) {
               localStorage.removeItem('user');
             }
