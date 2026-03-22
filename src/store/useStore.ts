@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { Node, KnowledgeDocument, NodeType, GraphListItem, User } from '../types';
+import { Node, KnowledgeDocument, NodeType, GraphListItem, User, Agent, AgentMessage } from '../types';
 import { knowledgeService, MetaAreaItem } from '../services/knowledgeService';
 import { askGemini } from '../services/geminiService';
+import { chatWithAgent, generateAgentAvatar } from '../services/agentService';
 
 export type ViewMode = 'edit' | 'preview' | 'json' | 'graphs';
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
@@ -189,6 +190,13 @@ interface AppState {
   user: User | null;
   versionHistory: { version: number; timestamp: string }[];
   
+  // Agent State
+  agents: Agent[];
+  agentMessages: AgentMessage[];
+  activeAgentId: string | null;
+  isAgentModalOpen: boolean;
+  isAgentChatOpen: boolean;
+  
   // AI Settings
   aiProvider: string;
   aiModel: string;
@@ -215,6 +223,10 @@ interface AppState {
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setVersionHistory: (history: { version: number; timestamp: string }[]) => void;
+  setAgents: (agents: Agent[]) => void;
+  setActiveAgentId: (id: string | null) => void;
+  setIsAgentModalOpen: (isOpen: boolean) => void;
+  setIsAgentChatOpen: (isOpen: boolean) => void;
 
   // Auth Actions
   login: (email: string) => Promise<void>;
@@ -237,6 +249,14 @@ interface AppState {
   generateSEOKeywords: (title: string) => Promise<string>;
   publishSEOPage: (seoData: { slug: string; title: string; description: string; ogImage: string; keywords: string }) => Promise<void>;
   fetchAvailableModels: () => Promise<void>;
+  
+  // Agent Actions
+  createAgent: (agent: Omit<Agent, 'id' | 'createdAt'>) => Promise<void>;
+  updateAgent: (agent: Agent) => Promise<void>;
+  deleteAgent: (id: string) => void;
+  sendAgentMessage: (content: string) => Promise<void>;
+  clearAgentChat: () => void;
+  generateAvatar: (name: string, description: string) => Promise<string>;
   
   // Node Operations
   addNode: (type: NodeType) => void;
@@ -277,6 +297,11 @@ export const useStore = create<AppState>()(
       editingNodeId: null,
       user: null,
       versionHistory: [],
+      agents: [],
+      agentMessages: [],
+      activeAgentId: null,
+      isAgentModalOpen: false,
+      isAgentChatOpen: false,
       aiProvider: 'gemini',
       aiModel: 'gemini-2.5-flash',
       availableModels: {},
@@ -311,6 +336,10 @@ export const useStore = create<AppState>()(
       },
       setAiModel: (aiModel) => set({ aiModel }),
       setVersionHistory: (versionHistory) => set({ versionHistory }),
+      setAgents: (agents) => set({ agents }),
+      setActiveAgentId: (activeAgentId) => set({ activeAgentId }),
+      setIsAgentModalOpen: (isAgentModalOpen) => set({ isAgentModalOpen }),
+      setIsAgentChatOpen: (isAgentChatOpen) => set({ isAgentChatOpen }),
 
       login: async (email) => {
         set({ isLoading: true, error: null });
@@ -832,6 +861,83 @@ export const useStore = create<AppState>()(
         }
       },
 
+      // Agent Actions
+      createAgent: async (agentData) => {
+        const newAgent: Agent = {
+          ...agentData,
+          id: uuidv4(),
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({ agents: [...state.agents, newAgent] }));
+      },
+
+      updateAgent: async (updatedAgent) => {
+        set((state) => ({
+          agents: state.agents.map((a) => (a.id === updatedAgent.id ? updatedAgent : a)),
+        }));
+      },
+
+      deleteAgent: (id) => {
+        set((state) => ({
+          agents: state.agents.filter((a) => a.id !== id),
+          activeAgentId: state.activeAgentId === id ? null : state.activeAgentId,
+          isAgentChatOpen: state.activeAgentId === id ? false : state.isAgentChatOpen,
+        }));
+      },
+
+      sendAgentMessage: async (content) => {
+        const { activeAgentId, agents, agentMessages, doc } = get();
+        const agent = agents.find((a) => a.id === activeAgentId);
+        if (!agent) return;
+
+        const userMessage: AgentMessage = {
+          id: uuidv4(),
+          agentId: agent.id,
+          role: 'user',
+          content,
+          timestamp: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          agentMessages: [...state.agentMessages, userMessage],
+          isLoading: true,
+        }));
+
+        try {
+          const messages = get().agentMessages.filter(m => m.agentId === agent.id);
+          const response = await chatWithAgent(agent, messages, doc);
+          
+          const modelMessage: AgentMessage = {
+            id: uuidv4(),
+            agentId: agent.id,
+            role: 'model',
+            content: response,
+            timestamp: new Date().toISOString(),
+          };
+
+          set((state) => ({
+            agentMessages: [...state.agentMessages, modelMessage],
+          }));
+        } catch (error) {
+          console.error('Agent Chat Error:', error);
+          set({ error: 'Failed to get response from agent' });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      clearAgentChat: () => {
+        const { activeAgentId } = get();
+        if (!activeAgentId) return;
+        set((state) => ({
+          agentMessages: state.agentMessages.filter((m) => m.agentId !== activeAgentId),
+        }));
+      },
+
+      generateAvatar: async (name, description) => {
+        return await generateAgentAvatar(name, description);
+      },
+
       addNode: (type) => {
         const newNode: Node = {
           id: uuidv4(),
@@ -891,7 +997,9 @@ export const useStore = create<AppState>()(
         selectedNodeType: state.selectedNodeType,
         searchQuery: state.searchQuery,
         aiProvider: state.aiProvider,
-        aiModel: state.aiModel
+        aiModel: state.aiModel,
+        agents: state.agents,
+        agentMessages: state.agentMessages
       }),
     }
   )

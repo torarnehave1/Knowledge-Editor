@@ -62,11 +62,13 @@ export async function askGemini(prompt: string, currentContent?: string | null, 
       body.model = model;
     }
 
+    const token = localStorage.getItem('emailVerificationToken') || VEGVISR_API_TOKEN;
+
     const response = await fetch(VEGVISR_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': VEGVISR_API_TOKEN,
+        'X-API-Token': token,
       },
       body: JSON.stringify(body)
     });

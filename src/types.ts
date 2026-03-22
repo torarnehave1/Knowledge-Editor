@@ -59,3 +59,21 @@ export interface KnowledgeDocument {
   nodes: Node[];
   edges: any[];
 }
+
+export interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  systemInstruction: string;
+  avatarUrl?: string;
+  graphId?: string; // Associated graph for context
+  createdAt: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  agentId: string;
+  role: 'user' | 'model';
+  content: string;
+  timestamp: string;
+}

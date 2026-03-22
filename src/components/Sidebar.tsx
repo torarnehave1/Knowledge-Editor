@@ -1,5 +1,5 @@
 
-import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles } from 'lucide-react';
+import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3 } from 'lucide-react';
 import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
 import { useState } from 'react';
@@ -31,7 +31,12 @@ export default function Sidebar() {
     setAiProvider,
     aiModel,
     setAiModel,
-    availableModels
+    availableModels,
+    agents,
+    setActiveAgentId,
+    setIsAgentModalOpen,
+    setIsAgentChatOpen,
+    deleteAgent
   } = useStore();
 
   const [showAiSettings, setShowAiSettings] = useState(false);
@@ -117,6 +122,74 @@ export default function Sidebar() {
                     {(availableModels[aiProvider] || []).find(m => m.id === aiModel)?.name || aiModel || 'Select Model'}
                   </span>
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">AI Agents</h2>
+                <button 
+                  onClick={() => setIsAgentModalOpen(true)}
+                  className="p-1 text-zinc-400 hover:text-indigo-600 transition-colors"
+                  title="Create Agent"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-1 mb-6">
+                {agents.length === 0 ? (
+                  <div className="px-2 py-3 text-[10px] text-zinc-500 italic border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-center">
+                    No agents defined yet
+                  </div>
+                ) : (
+                  agents.map(agent => (
+                    <div key={agent.id} className="group relative">
+                      <button
+                        onClick={() => {
+                          setActiveAgentId(agent.id);
+                          setIsAgentChatOpen(true);
+                        }}
+                        className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white dark:hover:bg-zinc-900 transition-all duration-200 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 hover:shadow-sm text-left"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {agent.avatarUrl ? (
+                            <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Bot size={16} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{agent.name}</p>
+                          <p className="text-[9px] text-zinc-500 truncate">{agent.description}</p>
+                        </div>
+                        <MessageSquare size={12} className="text-zinc-300 group-hover:text-indigo-500 transition-colors" />
+                      </button>
+                      
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-zinc-900 p-1 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveAgentId(agent.id);
+                            setIsAgentModalOpen(true);
+                          }}
+                          className="p-1 text-zinc-400 hover:text-blue-500 transition-colors"
+                        >
+                          <Edit3 size={12} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteAgent(agent.id);
+                          }}
+                          className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

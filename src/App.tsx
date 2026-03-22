@@ -13,6 +13,8 @@ import NodeRenderer from './components/NodeRenderer';
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { AgentModal } from './components/AgentModal';
+import { AgentChat } from './components/AgentChat';
 import { Login } from './components/Login';
 import { useStore } from './store/useStore';
 import { LogOut } from 'lucide-react';
@@ -664,6 +666,9 @@ export default function App() {
 
       {/* Version History Modal */}
       <VersionHistoryModal />
+
+      <AgentModal />
+      <AgentChat />
 
       {/* Slide-over Editor */}
       <AnimatePresence>
