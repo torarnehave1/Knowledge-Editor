@@ -28,7 +28,7 @@ export const Login: React.FC = () => {
         <div className="flex justify-center mb-8">
           <div className="w-20 h-20 bg-indigo-600/10 rounded-3xl flex items-center justify-center border border-indigo-500/20 shadow-inner">
             <img 
-              src="https://favicons.vegvisr.org/favicons/1774176116987-1-1774176120241-512x512.png" 
+              src="https://favicons.vegvisr.org/favicons/1774177136217-1-1774177138248-512x512.png" 
               alt="Knowledge Editor Logo" 
               className="w-14 h-14 rounded-xl shadow-2xl"
               referrerPolicy="no-referrer"

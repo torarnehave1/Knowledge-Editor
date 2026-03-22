@@ -24,7 +24,7 @@ export default function Sidebar() {
       <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-3 mb-1">
           <img 
-            src="https://favicons.vegvisr.org/favicons/1774176116987-1-1774176120241-512x512.png" 
+            src="https://favicons.vegvisr.org/favicons/1774177136217-1-1774177138248-512x512.png" 
             alt="Logo" 
             className="w-8 h-8 rounded-lg shadow-sm"
             referrerPolicy="no-referrer"
