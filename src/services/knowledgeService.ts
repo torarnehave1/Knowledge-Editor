@@ -2,10 +2,8 @@
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
-const API_TOKEN_RAW = import.meta.env.VITE_KNOWLEDGE_API_TOKEN;
-const API_TOKEN = (API_TOKEN_RAW && API_TOKEN_RAW !== "undefined") 
-  ? API_TOKEN_RAW 
-  : 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
+
+const getApiToken = () => localStorage.getItem('emailVerificationToken');
 
 export interface MetaAreaItem {
   name: string;
@@ -29,7 +27,7 @@ export const knowledgeService = {
 
     const response = await fetch(url, {
       headers: {
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       }
     });
     if (!response.ok) throw new Error('Failed to list graphs');
@@ -48,7 +46,7 @@ export const knowledgeService = {
 
     const response = await fetch(url, {
       headers: {
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       }
     });
     if (!response.ok) throw new Error('Failed to search graphs');
@@ -59,7 +57,7 @@ export const knowledgeService = {
   async listMetaAreas(): Promise<MetaAreaItem[]> {
     const response = await fetch('https://knowledge.vegvisr.org/getmetaareas', {
       headers: {
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       }
     });
     if (!response.ok) throw new Error('Failed to fetch meta areas');
@@ -94,7 +92,7 @@ export const knowledgeService = {
     try {
       const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${id}`, {
         headers: {
-          'X-API-Token': API_TOKEN
+          'X-API-Token': getApiToken()
         }
       });
       
@@ -178,7 +176,7 @@ export const knowledgeService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       },
       body: JSON.stringify(payload)
     });
@@ -200,7 +198,7 @@ export const knowledgeService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       },
       body: JSON.stringify({ id })
     });
@@ -212,7 +210,7 @@ export const knowledgeService = {
   async getTrash(): Promise<any[]> {
     const response = await fetch(`${API_BASE_URL}/getTrash`, {
       headers: {
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       }
     });
     if (!response.ok) throw new Error('Failed to fetch trash');
@@ -224,7 +222,7 @@ export const knowledgeService = {
     try {
       const response = await fetch(`${API_BASE_URL}/getknowgraphhistory?id=${id}`, {
         headers: {
-          'X-API-Token': API_TOKEN
+          'X-API-Token': getApiToken()
         }
       });
       if (!response.ok) {
@@ -262,7 +260,7 @@ export const knowledgeService = {
     try {
       const response = await fetch(`${API_BASE_URL}/getknowgraphversion?id=${id}&version=${version}`, {
         headers: {
-          'X-API-Token': API_TOKEN
+          'X-API-Token': getApiToken()
         }
       });
       if (!response.ok) {
@@ -299,7 +297,7 @@ export const knowledgeService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': API_TOKEN
+        'X-API-Token': getApiToken()
       },
       body: JSON.stringify({ trashId })
     });
@@ -312,7 +310,8 @@ export const knowledgeService = {
     const response = await fetch('https://seo.vegvisr.org/generate', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-API-Token': getApiToken()
       },
       body: JSON.stringify(payload)
     });

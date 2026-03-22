@@ -369,7 +369,7 @@ export const useStore = create<AppState>()(
           email: 'dev@vegvisr.org',
           role: 'admin',
           user_id: 'dev-user-id',
-          emailVerificationToken: 'dev-token'
+          emailVerificationToken: import.meta.env.VITE_VEGVISR_API_TOKEN || 'dev-token'
         };
         localStorage.setItem('user', JSON.stringify(mockUser));
         localStorage.setItem('emailVerificationToken', mockUser.emailVerificationToken);
@@ -828,7 +828,11 @@ export const useStore = create<AppState>()(
 
       fetchAvailableModels: async () => {
         try {
-          const response = await fetch('https://api.vegvisr.org/worker-ai/models');
+          const response = await fetch('https://api.vegvisr.org/worker-ai/models', {
+            headers: {
+              'X-API-Token': localStorage.getItem('emailVerificationToken') as string
+            }
+          });
           if (!response.ok) throw new Error('Failed to fetch models');
           const data = await response.json();
           const models = data.models || {};

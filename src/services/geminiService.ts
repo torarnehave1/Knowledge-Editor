@@ -2,10 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 const VEGVISR_API_URL = "https://api.vegvisr.org/worker-ai/chat";
-const VEGVISR_API_TOKEN_RAW = import.meta.env.VITE_VEGVISR_API_TOKEN;
-const VEGVISR_API_TOKEN = (VEGVISR_API_TOKEN_RAW && VEGVISR_API_TOKEN_RAW !== "undefined") 
-  ? VEGVISR_API_TOKEN_RAW 
-  : "gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac";
 
 export async function askGemini(
   prompt: string, 
@@ -70,13 +66,13 @@ export async function askGemini(
       body.model = model;
     }
 
-    const token = localStorage.getItem('emailVerificationToken') || VEGVISR_API_TOKEN;
+    const userToken = localStorage.getItem('emailVerificationToken');
 
     const response = await fetch(VEGVISR_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Token': token,
+        'X-API-Token': userToken as string,
       },
       body: JSON.stringify(body)
     });
