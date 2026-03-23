@@ -172,7 +172,6 @@ export default function App() {
                 .map((node) => (
                   <div key={node.id} className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                      <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
                       <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{node.label}</h3>
                     </div>
                     <NodeRenderer node={node} />
