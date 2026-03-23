@@ -803,7 +803,8 @@ export const useStore = create<AppState>()(
           const payload = {
             graphId: currentGraphId,
             ...seoData,
-            graphData: doc
+            graphData: doc,
+            createdByApp: "knowledge-editor"
           };
           const genResult = await knowledgeService.generateSEOPage(payload);
 
