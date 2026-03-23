@@ -401,11 +401,11 @@ export const useStore = create<AppState>()(
                 email,
                 role: roleData.role,
                 user_id: userData.user_id,
-                emailVerificationToken: magicToken
+                emailVerificationToken: verifyData.token || magicToken
               };
 
               localStorage.setItem('user', JSON.stringify(user));
-              localStorage.setItem('emailVerificationToken', magicToken);
+              localStorage.setItem('emailVerificationToken', verifyData.token || magicToken);
               set({ user });
               
               // Clean URL
