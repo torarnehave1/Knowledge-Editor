@@ -383,31 +383,37 @@ export const useStore = create<AppState>()(
         if (magicToken) {
           set({ isLoading: true });
           try {
+            // Step 1: Verify the magic link
             const verifyRes = await fetch(`https://cookie.vegvisr.org/login/magic/verify?token=${magicToken}`);
             const verifyData = await verifyRes.json();
 
             if (verifyData.success && verifyData.email) {
               const email = verifyData.email;
               
-              const [roleRes, userDataRes] = await Promise.all([
-                fetch(`https://dashboard.vegvisr.org/get-role?email=${email}`),
-                fetch(`https://dashboard.vegvisr.org/userdata?email=${email}`)
-              ]);
-
+              // Step 2: Get the REAL permanent token and user_id from the new backend
+              const tokenRes = await fetch('https://api.vegvisr.org/get-auth-token', {
+                method: 'GET',
+                headers: {
+                  'X-Email': email
+                }
+              });
+              
+              if (!tokenRes.ok) throw new Error('Failed to get auth token');
+              const tokenData = await tokenRes.json();
+              
+              // Step 3: Get role
+              const roleRes = await fetch(`https://dashboard.vegvisr.org/get-role?email=${email}`);
               const roleData = await roleRes.json();
-              const userData = await userDataRes.json();
 
               const user: User = {
                 email,
                 role: roleData.role,
-                user_id: userData.user_id,
-                emailVerificationToken: verifyData.token
+                user_id: tokenData.user_id,
+                emailVerificationToken: tokenData.emailVerificationToken
               };
 
               localStorage.setItem('user', JSON.stringify(user));
-              if (verifyData.token) {
-                localStorage.setItem('emailVerificationToken', verifyData.token);
-              }
+              localStorage.setItem('emailVerificationToken', tokenData.emailVerificationToken);
               set({ user });
               
               // Clean URL
