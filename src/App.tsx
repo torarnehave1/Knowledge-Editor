@@ -24,6 +24,10 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function App() {
+  const params = new URLSearchParams(window.location.search);
+  const graphId = params.get('graphId');
+  const isViewMode = window.location.pathname === '/view' && !!graphId;
+
   const {
     doc,
     setDoc,
@@ -91,9 +95,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    checkAuth();
-    fetchAvailableModels();
-  }, [checkAuth, fetchAvailableModels]);
+    if (!isViewMode) {
+      checkAuth();
+      fetchAvailableModels();
+    }
+  }, [checkAuth, fetchAvailableModels, isViewMode]);
+
+  useEffect(() => {
+    if (isViewMode && graphId && currentGraphId !== graphId) {
+      loadGraph(graphId);
+    }
+  }, [isViewMode, graphId, currentGraphId, loadGraph]);
 
   useEffect(() => {
     if (viewMode === 'json') {
@@ -130,6 +142,48 @@ export default function App() {
   };
 
   const editingNode = doc.nodes.find(n => n.id === editingNodeId);
+
+  if (isViewMode) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-y-auto p-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 size={40} className="text-indigo-600 animate-spin" />
+              <p className="text-zinc-500 font-medium">Loading content...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
+              <AlertCircle size={40} />
+              <p className="font-medium">{error}</p>
+            </div>
+          ) : (
+            <>
+              <header className="mb-12 text-center">
+                <h1 className="text-4xl font-bold mb-4">{doc.metadata?.title || 'Knowledge Graph'}</h1>
+                {doc.metadata?.metaArea && (
+                  <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-bold uppercase tracking-widest">
+                    {doc.metadata.metaArea}
+                  </span>
+                )}
+              </header>
+              {doc.nodes
+                .filter(node => node.visible)
+                .map((node) => (
+                  <div key={node.id} className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                      <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
+                      <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{node.label}</h3>
+                    </div>
+                    <NodeRenderer node={node} />
+                  </div>
+                ))}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Login />;
