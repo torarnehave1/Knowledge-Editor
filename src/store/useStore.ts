@@ -264,6 +264,7 @@ interface AppState {
   addNode: (type: NodeType) => void;
   saveNode: (updatedNode: Node) => void;
   deleteNode: (id: string) => void;
+  toggleNodeVisibility: (id: string) => void;
   moveNode: (index: number, direction: 'up' | 'down') => void;
   setNodes: (nodes: Node[]) => void;
 }
@@ -708,6 +709,11 @@ export const useStore = create<AppState>()(
                 nodes: state.doc.nodes.map(n => n.id === id ? { ...n, info: result } : n)
               }
             }));
+            
+            // Auto-save
+            if (get().currentGraphId) {
+              get().saveGraph();
+            }
           }
         } catch (e: any) {
           console.error(e);
@@ -962,9 +968,9 @@ export const useStore = create<AppState>()(
           set((state) => ({
             agentMessages: [...state.agentMessages, modelMessage],
           }));
-        } catch (error) {
+        } catch (error: any) {
           console.error('Agent Chat Error:', error);
-          set({ error: 'Failed to get response from agent' });
+          set({ error: error.message || 'Failed to get response from agent' });
         } finally {
           set({ isLoading: false });
         }
@@ -999,6 +1005,11 @@ export const useStore = create<AppState>()(
           doc: { ...state.doc, nodes: [...state.doc.nodes, newNode] },
           editingNodeId: newNode.id
         }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
       },
 
       saveNode: (updatedNode) => {
@@ -1009,6 +1020,11 @@ export const useStore = create<AppState>()(
           },
           editingNodeId: null
         }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
       },
 
       deleteNode: (id) => {
@@ -1019,6 +1035,25 @@ export const useStore = create<AppState>()(
           },
           editingNodeId: null
         }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
+      },
+
+      toggleNodeVisibility: (id) => {
+        set((state) => ({
+          doc: {
+            ...state.doc,
+            nodes: state.doc.nodes.map(n => n.id === id ? { ...n, visible: !n.visible } : n)
+          }
+        }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
       },
 
       moveNode: (index, direction) => {
@@ -1029,9 +1064,21 @@ export const useStore = create<AppState>()(
           [newNodes[index], newNodes[targetIndex]] = [newNodes[targetIndex], newNodes[index]];
           return { doc: { ...state.doc, nodes: newNodes } };
         });
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
       },
 
-      setNodes: (nodes) => set((state) => ({ doc: { ...state.doc, nodes } })),
+      setNodes: (nodes) => {
+        set((state) => ({ doc: { ...state.doc, nodes } }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
+      },
     }),
     {
       name: 'knowledge-graph-storage',

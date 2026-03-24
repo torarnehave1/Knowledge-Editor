@@ -81,6 +81,7 @@ export default function App() {
     setNodes,
     saveNode,
     deleteNode,
+    toggleNodeVisibility,
     user,
     logout,
     checkAuth,
@@ -680,12 +681,7 @@ export default function App() {
                         {viewMode === 'edit' && (
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => {
-                                setDoc(prev => ({
-                                  ...prev,
-                                  nodes: prev.nodes.map(n => n.id === node.id ? { ...n, visible: !n.visible } : n)
-                                }));
-                              }}
+                              onClick={() => toggleNodeVisibility(node.id)}
                               className={cn(
                                 "p-2 rounded-xl transition-colors",
                                 node.visible ? "text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30" : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"

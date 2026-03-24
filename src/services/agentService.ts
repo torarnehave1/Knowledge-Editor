@@ -1,6 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { Agent, AgentMessage, KnowledgeDocument } from "../types";
+import { askGemini } from "./geminiService";
 
 // Initialize the SDK with the API key from environment
 // Moved inside functions to ensure up-to-date API key as per guidelines
@@ -35,10 +36,6 @@ export async function chatWithAgent(
   messages: AgentMessage[], 
   graphData?: KnowledgeDocument
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY || '';
-  const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-3-flash-preview";
-  
   const graphContext = graphData ? formatGraphContext(graphData) : "No graph context provided.";
   
   const systemInstruction = `
@@ -51,26 +48,50 @@ ${graphContext}
   `.trim();
 
   const history = messages.map(m => ({
-    role: m.role,
-    parts: [{ text: m.content }]
+    role: m.role === 'model' ? 'assistant' : 'user', // Map roles for the proxy
+    content: m.content
   }));
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: history,
-    config: {
-      systemInstruction,
+  try {
+    // Use the proxy service instead of direct SDK call to avoid key exposure and ad-blockers
+    const response = await askGemini(
+      "", 
+      null, 
+      "gemini", 
+      "gemini-3-flash-preview", 
+      systemInstruction, 
+      history
+    );
+    return response || "I'm sorry, I couldn't generate a response.";
+  } catch (error) {
+    console.error("Agent proxy chat failed, attempting direct fallback if key exists:", error);
+    
+    // Fallback to direct SDK only if a key is available
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+    if (apiKey) {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
+        config: { systemInstruction }
+      });
+      return response.text || "I'm sorry, I couldn't generate a response.";
     }
-  });
-
-  return response.text || "I'm sorry, I couldn't generate a response.";
+    throw error;
+  }
 }
 
 /**
  * Generates an avatar image for an agent based on its description.
  */
 export async function generateAgentAvatar(agentName: string, description: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY || '';
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+  
+  if (!apiKey) {
+    console.warn("API key missing for avatar generation, using fallback.");
+    return `https://picsum.photos/seed/${encodeURIComponent(agentName)}/200/200`;
+  }
+
   const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-2.5-flash-image";
   const prompt = `A professional and stylized avatar icon for an AI agent named "${agentName}". The agent's purpose is: ${description}. The style should be clean, modern, and suitable for a profile picture. No text in the image.`;

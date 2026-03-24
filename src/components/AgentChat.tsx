@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, Bot, Trash2, Maximize2, Minimize2, Loader2, User } from 'lucide-react';
+import { Send, X, Bot, Trash2, Maximize2, Minimize2, Loader2, User, Key, ShieldAlert } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,7 +15,9 @@ export const AgentChat: React.FC = () => {
     agentMessages, 
     sendAgentMessage, 
     clearAgentChat,
-    isLoading 
+    isLoading,
+    error,
+    setError
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -39,7 +41,15 @@ export const AgentChat: React.FC = () => {
     
     const message = input;
     setInput('');
+    setError(null);
     await sendAgentMessage(message);
+  };
+
+  const handleOpenKeySelection = async () => {
+    if (typeof window !== 'undefined' && (window as any).aistudio) {
+      await (window as any).aistudio.openSelectKey();
+      setError(null);
+    }
   };
 
   if (!isAgentChatOpen || !activeAgent) return null;
@@ -141,6 +151,32 @@ export const AgentChat: React.FC = () => {
               </div>
             </div>
           ))}
+
+          {error && (
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-800 text-sm space-y-3">
+              <div className="flex items-center gap-2 font-bold">
+                <ShieldAlert size={18} />
+                Connection Error
+              </div>
+              <p className="text-xs leading-relaxed opacity-80">{error}</p>
+              
+              {error.toLowerCase().includes('api key') && (
+                <button
+                  onClick={handleOpenKeySelection}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95"
+                >
+                  <Key size={14} />
+                  SELECT API KEY
+                </button>
+              )}
+
+              {error.toLowerCase().includes('blocked_by_client') || error.toLowerCase().includes('failed to fetch') && (
+                <div className="p-3 bg-white/50 rounded-xl text-[10px] italic leading-tight">
+                  Note: This error is often caused by ad-blockers or privacy extensions blocking the Google Gemini API. Try disabling them for this site.
+                </div>
+              )}
+            </div>
+          )}
           {isLoading && (
             <div className="flex justify-start">
               <div className="flex gap-3 items-center">
