@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History } from 'lucide-react';
+import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -75,6 +75,8 @@ export default function App() {
     createNewGraph,
     deleteGraph,
     restoreGraph,
+    defaultGraphId,
+    setDefaultGraph,
     moveNode,
     setNodes,
     saveNode,
@@ -337,7 +339,7 @@ export default function App() {
               {saveStatus === 'saving' ? 'Saving...' : 
                saveStatus === 'success' ? 'Saved' : 
                saveStatus === 'error' ? 'Error' : 
-               'Save Document'}
+               !currentGraphId ? 'Save as New Graph' : 'Save Document'}
             </button>
           </div>
         </header>
@@ -542,6 +544,21 @@ export default function App() {
                               title="Delete Graph"
                             >
                               <Trash2 size={14} />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDefaultGraph(defaultGraphId === graph.id ? null : graph.id);
+                              }}
+                              className={cn(
+                                "p-1.5 rounded-lg transition-all active:scale-90",
+                                defaultGraphId === graph.id 
+                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-500" 
+                                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-amber-500"
+                              )}
+                              title={defaultGraphId === graph.id ? "Remove as Default" : "Set as Default"}
+                            >
+                              <Star size={14} fill={defaultGraphId === graph.id ? "currentColor" : "none"} />
                             </button>
                           </div>
                         </div>

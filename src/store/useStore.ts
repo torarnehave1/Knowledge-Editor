@@ -188,6 +188,7 @@ interface AppState {
   deleteConfirmationId: string | null;
   editingNodeId: string | null;
   user: User | null;
+  defaultGraphId: string | null;
   versionHistory: { version: number; timestamp: string }[];
   
   // Agent State
@@ -220,6 +221,7 @@ interface AppState {
   setDeleteConfirmationId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void;
   setUser: (user: User | null) => void;
+  setDefaultGraph: (id: string | null) => void;
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setVersionHistory: (history: { version: number; timestamp: string }[]) => void;
@@ -296,6 +298,7 @@ export const useStore = create<AppState>()(
       deleteConfirmationId: null,
       editingNodeId: null,
       user: null,
+      defaultGraphId: localStorage.getItem('defaultGraphId'),
       versionHistory: [],
       agents: [],
       agentMessages: [],
@@ -329,6 +332,14 @@ export const useStore = create<AppState>()(
       setDeleteConfirmationId: (deleteConfirmationId) => set({ deleteConfirmationId }),
       setEditingNodeId: (editingNodeId) => set({ editingNodeId }),
       setUser: (user) => set({ user }),
+      setDefaultGraph: (id) => {
+        if (id) {
+          localStorage.setItem('defaultGraphId', id);
+        } else {
+          localStorage.removeItem('defaultGraphId');
+        }
+        set({ defaultGraphId: id });
+      },
       setAiProvider: (aiProvider) => {
         const { availableModels } = get();
         const models = availableModels[aiProvider] || [];
@@ -416,6 +427,12 @@ export const useStore = create<AppState>()(
               localStorage.setItem('emailVerificationToken', tokenData.emailVerificationToken);
               set({ user });
               
+              // Load default graph if exists
+              const defaultId = get().defaultGraphId;
+              if (defaultId) {
+                get().loadGraph(defaultId);
+              }
+
               // Clean URL
               window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -433,6 +450,12 @@ export const useStore = create<AppState>()(
               set({ user });
               if (user.emailVerificationToken) {
                 localStorage.setItem('emailVerificationToken', user.emailVerificationToken);
+              }
+              
+              // Load default graph if exists
+              const defaultId = get().defaultGraphId;
+              if (defaultId && !get().currentGraphId) {
+                get().loadGraph(defaultId);
               }
             } catch (e) {
               localStorage.removeItem('user');
