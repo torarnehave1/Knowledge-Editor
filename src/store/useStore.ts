@@ -267,6 +267,7 @@ interface AppState {
   toggleNodeVisibility: (id: string) => void;
   moveNode: (index: number, direction: 'up' | 'down') => void;
   setNodes: (nodes: Node[]) => void;
+  updateMetadata: (data: Partial<KnowledgeDocument['metadata']>) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -954,9 +955,46 @@ export const useStore = create<AppState>()(
         }));
 
         try {
+          const { doc } = get();
           const messages = get().agentMessages.filter(m => m.agentId === agent.id);
           const response = await chatWithAgent(agent, messages, doc);
           
+          // Parse actions from response
+          const actionRegex = /\[ACTION:\s*({.*?})\]/g;
+          let match;
+          while ((match = actionRegex.exec(response)) !== null) {
+            try {
+              const action = JSON.parse(match[1]);
+              console.log('Agent Action:', action);
+              
+              if (action.type === 'ADD_NODE') {
+                get().addNode(action.nodeType || 'fulltext');
+              } else if (action.type === 'DELETE_NODE') {
+                get().deleteNode(action.id);
+              } else if (action.type === 'UPDATE_NODE') {
+                const node = get().doc.nodes.find(n => n.id === action.id);
+                if (node) {
+                  get().saveNode({ ...node, ...action.data });
+                }
+              } else if (action.type === 'UPDATE_METADATA') {
+                get().updateMetadata(action.data);
+              } else if (action.type === 'SEARCH_GRAPHS') {
+                set({ searchQuery: action.query, selectedMetaArea: action.metaArea || 'All', viewMode: 'graphs' });
+                get().fetchGraphs();
+              } else if (action.type === 'LOAD_GRAPH') {
+                get().loadGraph(action.id);
+              } else if (action.type === 'CREATE_GRAPH') {
+                set({ newGraphTitle: action.title || 'New Graph', newGraphMetaArea: action.metaArea || 'General' });
+                get().createNewGraph();
+              } else if (action.type === 'LIST_META_AREAS') {
+                set({ viewMode: 'graphs' });
+                get().fetchGraphs(); // fetchGraphs also fetches meta areas
+              }
+            } catch (e) {
+              console.error('Failed to parse agent action:', e);
+            }
+          }
+
           const modelMessage: AgentMessage = {
             id: uuidv4(),
             agentId: agent.id,
@@ -1073,6 +1111,20 @@ export const useStore = create<AppState>()(
 
       setNodes: (nodes) => {
         set((state) => ({ doc: { ...state.doc, nodes } }));
+        
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
+      },
+
+      updateMetadata: (data) => {
+        set((state) => ({
+          doc: {
+            ...state.doc,
+            metadata: { ...state.doc.metadata, ...data }
+          }
+        }));
         
         // Auto-save
         if (get().currentGraphId) {

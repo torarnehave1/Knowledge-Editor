@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Bot, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Bot, Sparkles, Image as ImageIcon, Loader2, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Agent } from '../types';
 
@@ -23,7 +23,13 @@ export const AgentModal: React.FC = () => {
   const [description, setDescription] = useState('');
   const [systemInstruction, setSystemInstruction] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [model, setModel] = useState('gemini-3-flash-preview');
+  const [maxTurns, setMaxTurns] = useState(20);
+  const [temperature, setTemperature] = useState(0.7);
+  const [modalities, setModalities] = useState<string[]>(['text']);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingAgent && isAgentModalOpen) {
@@ -31,11 +37,19 @@ export const AgentModal: React.FC = () => {
       setDescription(editingAgent.description);
       setSystemInstruction(editingAgent.systemInstruction);
       setAvatarUrl(editingAgent.avatarUrl || '');
+      setModel(editingAgent.model || 'gemini-3-flash-preview');
+      setMaxTurns(editingAgent.maxTurns || 20);
+      setTemperature(editingAgent.temperature || 0.7);
+      setModalities(editingAgent.modalities || ['text']);
     } else if (isAgentModalOpen) {
       setName('');
       setDescription('');
       setSystemInstruction('You are a helpful AI assistant specialized in analyzing knowledge graphs.');
       setAvatarUrl('');
+      setModel('gemini-3-flash-preview');
+      setMaxTurns(20);
+      setTemperature(0.7);
+      setModalities(['text']);
     }
   }, [editingAgent, isAgentModalOpen]);
 
@@ -49,6 +63,10 @@ export const AgentModal: React.FC = () => {
         description,
         systemInstruction,
         avatarUrl,
+        model,
+        maxTurns,
+        temperature,
+        modalities,
       });
     } else {
       await createAgent({
@@ -57,6 +75,10 @@ export const AgentModal: React.FC = () => {
         systemInstruction,
         avatarUrl,
         graphId: currentGraphId || undefined,
+        model,
+        maxTurns,
+        temperature,
+        modalities,
       });
     }
     setIsAgentModalOpen(false);
@@ -72,6 +94,50 @@ export const AgentModal: React.FC = () => {
       console.error(error);
     } finally {
       setIsGeneratingAvatar(false);
+    }
+  };
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setAvatarUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    // Handle files
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFile(e.dataTransfer.files[0]);
+      return;
+    }
+
+    // Handle URLs (e.g. from Photos app or web)
+    const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (url && (url.startsWith('http') || url.startsWith('data:image'))) {
+      setAvatarUrl(url);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFile(e.target.files[0]);
     }
   };
 
@@ -133,11 +199,34 @@ export const AgentModal: React.FC = () => {
               
               <div className="w-32 flex flex-col items-center gap-2">
                 <label className="block text-sm font-medium text-gray-700">Avatar</label>
-                <div className="w-32 h-32 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative group">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <div 
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`w-32 h-32 rounded-2xl bg-gray-100 border-2 border-dashed flex items-center justify-center overflow-hidden relative group cursor-pointer transition-all ${
+                    isDragging ? 'border-indigo-500 bg-indigo-50 scale-105' : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+                  }`}
+                >
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <>
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload className="text-white" size={24} />
+                      </div>
+                    </>
                   ) : (
-                    <ImageIcon className="text-gray-400" size={32} />
+                    <div className="flex flex-col items-center gap-1 text-gray-400">
+                      <ImageIcon size={32} />
+                      <span className="text-[10px] font-medium">Drop or Click</span>
+                    </div>
                   )}
                   {isGeneratingAvatar && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -146,7 +235,10 @@ export const AgentModal: React.FC = () => {
                   )}
                 </div>
                 <button
-                  onClick={handleGenerateAvatar}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGenerateAvatar();
+                  }}
                   disabled={!name || !description || isGeneratingAvatar}
                   className="w-full py-2 px-3 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-colors"
                 >
@@ -168,6 +260,82 @@ export const AgentModal: React.FC = () => {
               <p className="mt-2 text-xs text-gray-400">
                 Tip: Be specific about how the agent should interpret the knowledge graph data.
               </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">AI Model</label>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white"
+                  >
+                    <option value="gemini-3-flash-preview">Gemini 3 Flash (Fast)</option>
+                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Advanced)</option>
+                    <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Efficient)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Conversation Turns: {maxTurns}</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value={maxTurns}
+                    onChange={(e) => setMaxTurns(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>Short Context</span>
+                    <span>Long Context</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Creativity (Temperature): {temperature}</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>Precise</span>
+                    <span>Creative</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modalities</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['text', 'image', 'video', 'audio'].map((mod) => (
+                      <button
+                        key={mod}
+                        onClick={() => {
+                          if (modalities.includes(mod)) {
+                            setModalities(modalities.filter(m => m !== mod));
+                          } else {
+                            setModalities([...modalities, mod]);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          modalities.includes(mod)
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

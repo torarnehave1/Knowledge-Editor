@@ -9,7 +9,8 @@ export async function askGemini(
   provider: string = "gemini", 
   model?: string, 
   customSystem?: string,
-  history: { role: string, content: string }[] = []
+  history: { role: string, content: string }[] = [],
+  temperature?: number
 ) {
   const defaultSystem = `
     You are a Knowledge Graph Assistant. Your goal is to help users build and refine their knowledge graphs.
@@ -64,6 +65,10 @@ export async function askGemini(
 
     if (model && model.trim() !== '') {
       body.model = model;
+    }
+
+    if (temperature !== undefined) {
+      body.temperature = temperature;
     }
 
     const userToken = localStorage.getItem('emailVerificationToken');

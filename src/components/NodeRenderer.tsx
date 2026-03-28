@@ -1,18 +1,196 @@
-
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Node } from '../types';
+import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity } from 'lucide-react';
 
 interface NodeRendererProps {
   node: Node;
 }
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const onTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const onLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (audioRef.current) {
+      const time = parseFloat(e.target.value);
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
   const getYouTubeId = (url: string) => {
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/);
     return match ? match[1] : null;
   };
+
+  if (node.type === 'audio' && node.path) {
+    return (
+      <div className="my-8 p-8 rounded-[2.5rem] bg-[#151619] border border-zinc-800 shadow-2xl overflow-hidden relative group">
+        {/* Background Glow */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 blur-[100px] rounded-full"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 blur-[100px] rounded-full"></div>
+
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-2xl bg-zinc-800/50 border border-zinc-700 text-indigo-400">
+                <Music size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white tracking-tight">{node.label}</h3>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Audio Stream • High Quality</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/50 border border-zinc-700">
+              <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`}></div>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tighter">
+                {isPlaying ? 'Live' : 'Idle'}
+              </span>
+            </div>
+          </div>
+
+          <audio
+            ref={audioRef}
+            src={node.path}
+            onTimeUpdate={onTimeUpdate}
+            onLoadedMetadata={onLoadedMetadata}
+            onEnded={() => setIsPlaying(false)}
+          />
+
+          <div className="space-y-6">
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                value={currentTime}
+                step="0.01"
+                onChange={handleSeek}
+                className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
+              />
+              <div className="flex justify-between text-[10px] font-mono text-zinc-500 tracking-widest">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-8">
+              <button className="text-zinc-500 hover:text-white transition-colors">
+                <SkipBack size={20} />
+              </button>
+              <button
+                onClick={togglePlay}
+                className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
+              >
+                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+              </button>
+              <button className="text-zinc-500 hover:text-white transition-colors">
+                <SkipForward size={20} />
+              </button>
+            </div>
+
+            {/* Volume / Extra */}
+            <div className="flex items-center justify-between pt-4 border-t border-zinc-800/50">
+              <div className="flex items-center gap-3 text-zinc-500">
+                <Volume2 size={16} />
+                <div className="w-24 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-2/3 h-full bg-zinc-600"></div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <Activity size={16} className={isPlaying ? 'text-indigo-400' : 'text-zinc-700'} />
+                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">44.1kHz / 24-bit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {node.info && (
+          <div className="mt-8 pt-8 border-t border-zinc-800/50">
+            <div className="prose prose-invert prose-sm max-w-none opacity-60 group-hover:opacity-100 transition-opacity">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                {node.info}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === 'audio-visualizer') {
+    return (
+      <div className="my-8 p-8 rounded-[2.5rem] bg-[#151619] border border-zinc-800 shadow-2xl overflow-hidden relative">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="p-3 rounded-2xl bg-zinc-800/50 border border-zinc-700 text-emerald-400">
+            <Activity size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white tracking-tight">{node.label}</h3>
+            <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Real-time Waveform Analysis</p>
+          </div>
+        </div>
+        
+        <div className="h-48 flex items-end justify-between gap-1 px-4">
+          {[...Array(40)].map((_, i) => (
+            <div 
+              key={i} 
+              className="flex-1 bg-gradient-to-t from-indigo-500 to-emerald-400 rounded-full transition-all duration-300"
+              style={{ 
+                height: `${Math.random() * 80 + 10}%`,
+                opacity: Math.random() * 0.5 + 0.5
+              }}
+            ></div>
+          ))}
+        </div>
+
+        <div className="mt-8 grid grid-cols-3 gap-4">
+          {['Frequency', 'Amplitude', 'Phase'].map((stat) => (
+            <div key={stat} className="p-4 rounded-2xl bg-zinc-800/30 border border-zinc-800/50 text-center">
+              <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">{stat}</p>
+              <p className="text-sm font-bold text-white font-mono">{(Math.random() * 100).toFixed(2)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (node.type === 'youtube-video' && node.path) {
     const videoId = getYouTubeId(node.path);
@@ -64,15 +242,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     processed = processed.replace(/!\[YOUTUBE src=(.*?)\](.*?)\[END YOUTUBE\]/g, (_, src, title) => {
       const videoId = getYouTubeId(src);
       const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : src;
-      return `<div class="my-6 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-lg bg-black aspect-video">
-        <iframe
-          src="${embedUrl}"
-          title="${title}"
-          class="w-full h-full border-none"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        ></iframe>
-      </div>`;
+      return `\n\n<div class="my-6 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-lg bg-black aspect-video"><iframe src="${embedUrl}" title="${title}" class="w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>\n\n`;
     });
 
     // Handle [COMMENTARY | id='...']...[END COMMENTARY]
@@ -90,17 +260,12 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
     // Handle [QUOTE | Cited='...']...[END QUOTE]
     processed = processed.replace(/\[QUOTE\s*\|\s*Cited\s*=\s*['"]?(.*?)['"]?\]([\s\S]*?)\[END QUOTE\]/gi, (_, cited, text) => {
-      return `<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden">
-        <div class="mb-3 leading-relaxed break-words">${text}</div>
-        <cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite>
-      </blockquote>`;
+      return `\n\n<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden"><div class="mb-3 leading-relaxed break-words">${text}</div><cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite></blockquote>\n\n`;
     });
 
     // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
     processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
-      return `<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};">
-        <div class="break-words">${text}</div>
-      </div>`;
+      return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">${text}</div></div>\n\n`;
     });
 
     // Handle [FANCY | font-size:...; color:...; background-image:url('...')]...[END FANCY]
@@ -122,16 +287,15 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         }
       });
 
+      const hasBgImage = !!styleObj.backgroundImage;
       const styleString = Object.entries(styleObj).map(([k, v]) => `${k.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}: ${v}`).join('; ');
 
-      return `<div class="p-12 my-10 rounded-[2.5rem] bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[500px] relative overflow-hidden shadow-2xl border border-white/10" style="${styleString}">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
-        <div class="relative z-10 w-full max-w-4xl mx-auto p-12 rounded-[2rem] prose-invert drop-shadow-2xl">
-          <div class="text-white break-words overflow-wrap-anywhere">
-            ${text}
-          </div>
-        </div>
-      </div>`;
+      if (hasBgImage) {
+        return `\n\n<div class="p-12 my-10 rounded-[2.5rem] bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[400px] relative overflow-hidden shadow-2xl border border-white/10" style="${styleString}"><div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div><div class="relative z-10 w-full max-w-4xl mx-auto p-12 rounded-[2rem] prose-invert drop-shadow-2xl"><div class="text-white break-words overflow-wrap-anywhere">${text}</div></div></div>\n\n`;
+      } else {
+        // Simple styled container for cases like large characters or highlighted text
+        return `\n\n<div class="p-8 my-6 rounded-3xl flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50" style="${styleString}"><div class="break-words overflow-wrap-anywhere">${text}</div></div>\n\n`;
+      }
     });
 
     return processed;

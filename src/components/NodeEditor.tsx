@@ -303,6 +303,8 @@ export default function NodeEditor() {
               <option value="info">Info</option>
               <option value="image">Image</option>
               <option value="youtube-video">YouTube Video</option>
+              <option value="audio">Audio</option>
+              <option value="audio-visualizer">Audio Visualizer</option>
               <option value="REG">Registration</option>
               <option value="html-node">HTML Section</option>
             </select>
@@ -328,6 +330,27 @@ export default function NodeEditor() {
               className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
             <p className="text-[10px] text-zinc-500">Paste the full YouTube URL here (e.g., https://youtu.be/dQw4w9WgXcQ)</p>
+          </div>
+        )}
+
+        {editedNode.type === 'audio' && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Audio URL</label>
+            <input
+              type="text"
+              name="path"
+              value={editedNode.path || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditedNode(prev => prev ? ({ 
+                  ...prev, 
+                  path: val
+                }) : null);
+              }}
+              placeholder="https://audio.vegvisr.org/..."
+              className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <p className="text-[10px] text-zinc-500">Paste the full audio file URL here (mp3, wav, etc.)</p>
           </div>
         )}
 

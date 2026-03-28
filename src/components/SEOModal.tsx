@@ -44,11 +44,28 @@ export default function SEOModal() {
         if (imageNode && imageNode.path) {
           setOgImage(imageNode.path);
         } else {
-          // Look for markdown images in info
-          const imgMatch = doc.nodes.find(n => n.info?.match(/!\[.*?\]\((.*?)\)/))?.info?.match(/!\[.*?\]\((.*?)\)/);
-          if (imgMatch && imgMatch[1]) {
-            setOgImage(imgMatch[1]);
-          } else {
+          // Look for images in info (Markdown or HTML)
+          let found = false;
+          for (const node of doc.nodes) {
+            if (node.info) {
+              // Try Markdown
+              const mdMatch = node.info.match(/!\[.*?\]\((.*?)\)/);
+              if (mdMatch && mdMatch[1]) {
+                setOgImage(mdMatch[1]);
+                found = true;
+                break;
+              }
+              
+              // Try HTML img tag
+              const htmlMatch = node.info.match(/<img[^>]+src=["']([^"']+)["']/i);
+              if (htmlMatch && htmlMatch[1]) {
+                setOgImage(htmlMatch[1]);
+                found = true;
+                break;
+              }
+            }
+          }
+          if (!found) {
             setOgImage('');
           }
         }
@@ -99,12 +116,20 @@ export default function SEOModal() {
       return;
     }
 
-    // 2. Check for markdown images in info fields
+    // 2. Check for images in info fields (Markdown or HTML)
     for (const node of doc.nodes) {
       if (node.info) {
-        const imgMatch = node.info.match(/!\[.*?\]\((.*?)\)/);
-        if (imgMatch && imgMatch[1]) {
-          setOgImage(imgMatch[1]);
+        // Try Markdown first
+        const mdMatch = node.info.match(/!\[.*?\]\((.*?)\)/);
+        if (mdMatch && mdMatch[1]) {
+          setOgImage(mdMatch[1]);
+          return;
+        }
+        
+        // Try HTML img tag
+        const htmlMatch = node.info.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (htmlMatch && htmlMatch[1]) {
+          setOgImage(htmlMatch[1]);
           return;
         }
       }

@@ -68,6 +68,10 @@ export interface Agent {
   avatarUrl?: string;
   graphId?: string; // Associated graph for context
   createdAt: string;
+  model?: string;
+  maxTurns?: number;
+  temperature?: number;
+  modalities?: string[]; // e.g., ['text', 'image', 'video']
 }
 
 export interface AgentMessage {
