@@ -1,26 +1,30 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { Node, KnowledgeDocument, NodeType, GraphListItem, User, Agent, AgentMessage } from '../types';
+import { Node, KnowledgeDocument, NodeType, GraphListItem, User, Agent, AgentMessage, AgentLog } from '../types';
 import { knowledgeService, MetaAreaItem } from '../services/knowledgeService';
 import { askGemini } from '../services/geminiService';
 import { chatWithAgent, generateAgentAvatar } from '../services/agentService';
+import { workerAIService } from '../services/workerAIService';
 
 export type ViewMode = 'edit' | 'preview' | 'json' | 'graphs';
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 const INITIAL_DATA: KnowledgeDocument = {
   metadata: {
-    title: "New Knowledge Graph",
-    metaArea: "General"
+    title: "Soundarya Lahari - Verse 32",
+    description: "The Secret of the Panchadashakshari Mantra (Kadi Vidya)",
+    metaArea: "Spiritual / Tantra / Sanskrit Literature",
+    createdBy: "Knowledge Editor",
+    version: 1
   },
   nodes: [
     {
-      id: "c3988290-4c89-4f85-849d-fb0c6a04e5ae",
+      id: "hero-section-node",
       label: "Hero Section",
-      color: "#f4e2d8",
+      color: "#FFD700",
       type: "notes",
-      info: "[FANCY | font-size:18.5em; color:#FFFFFF; background-image:url('https://images.pexels.com/photos/31402193/pexels-photo-31402193.jpeg')]Ancient Wisdom[END FANCY]",
+      info: "[FANCY | font-size:6.5em; color:#FFD700; background-image:url('https://images.pexels.com/photos/2072453/pexels-photo-2072453.jpeg')]Verse 32: Kadi Vidya[END FANCY]",
       bibl: [],
       imageWidth: "100%",
       imageHeight: "100%",
@@ -28,11 +32,11 @@ const INITIAL_DATA: KnowledgeDocument = {
       path: null
     },
     {
-      id: "fulltextNode_20250506",
-      label: "Intro to the Seven Hermetic Principles",
+      id: "the-verse-node",
+      label: "The Verse",
       color: "#4a148c",
       type: "fulltext",
-      info: "![Header|width:100%;height:300px;object-fit:cover;object-position:center](https://images.pexels.com/photos/30575843/pexels-photo-30575843/free-photo-of-ancient-stone-turtles-in-hoa-l-vietnam.jpeg)\n\n [FANCY | font-size:0.5em; color:#555; text-align: left]Ancient Bas-Relief Art at Angkor Wat<br><small>Photo by <a href='https://www.pexels.com/photo/ancient-bas-relief-art-at-angkor-wat-31402193/'>Karolina</a></small>[END FANCY]\n\n[SECTION | background-color:'#1b1b2f'; color:'#e0e0e0']\nJoin us for a one-hour live introduction to the **Seven Hermetic Principles** — timeless teachings that bridge ancient mysticism and modern consciousness. This immersive session will explore Mentalism, Correspondence, Vibration, Polarity, Rhythm, Cause & Effect, and Gender — keys to mastering inner transformation and cosmic understanding.\n[END SECTION]\n\n[QUOTE | Cited='The Kybalion']The lips of wisdom are closed, except to the ears of Understanding.[END QUOTE]",
+      info: "## Śivaḥ śaktiḥ kāmaḥ kṣitira-tha raviḥ śītakiraṇaḥ smaro haṃsaḥ śakrastadanu ca parā-māra-harayaḥ...\n\nThis verse uses code words (**Sanketa**) to reveal the 15 syllables of the Srividya Mantra without explicitly naming them.\n\n### Sanketa (Coding)\nThe verse uses \"Shiva\" to mean the letter **Ka**, \"Shakti\" for **E**, \"Kama\" for **I**, and \"Kshiti\" for **La**.",
       bibl: [],
       imageWidth: "100%",
       imageHeight: "100%",
@@ -40,90 +44,35 @@ const INITIAL_DATA: KnowledgeDocument = {
       path: null
     },
     {
-      id: "3d-canvas-v4",
-      label: "Knowledge Graph Universe — Semantic 3D",
+      id: "panchadashakshari-mantra-node",
+      label: "Panchadashakshari Mantra",
+      color: "#FFD700",
+      type: "notes",
+      info: "The 15-lettered mantra divided into three sections (**Kutas**):\n\n1. **Vagbhava Kuta**: Ka-E-I-La-Hrim\n2. **Kamaraja Kuta**: Ha-Sa-Ka-Ha-La-Hrim\n3. **Shakti Kuta**: Sa-Ka-La-Hrim",
+      bibl: [],
+      imageWidth: "100%",
+      imageHeight: "100%",
+      visible: true,
+      path: null
+    },
+    {
+      id: "adi-shankara-node",
+      label: "Adi Shankara",
+      color: "#f4e2d8",
+      type: "notes",
+      info: "The traditional author of **Soundarya Lahari**, credited with systematizing the worship of the Divine Mother.",
+      bibl: [],
+      imageWidth: "100%",
+      imageHeight: "100%",
+      visible: true,
+      path: null
+    },
+    {
+      id: "kadi-vidya-school-node",
+      label: "Kadi Vidya School",
       color: "#38bdf8",
-      type: "html-node",
-      info: `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Knowledge Graph Universe — Cytoscape 2D</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0e1a; }
-body { color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-#canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
-#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0a0e1a; z-index: 100; transition: opacity 0.5s; }
-#loading h1 { font-size: 1.4rem; margin-bottom: 12px; color: #38bdf8; }
-#hud { position: fixed; top: 20px; left: 20px; z-index: 10; pointer-events: none; }
-#hud h2 { font-size: 1.2rem; color: #38bdf8; margin-bottom: 4px; }
-.btn-explore { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; padding: 12px 24px; border-radius: 9999px; background: #38bdf8; color: #0a0e1a; font-weight: bold; border: none; cursor: pointer; transition: all 0.2s; }
-.btn-explore:hover { background: #22a5e0; transform: translateX(-50%) scale(1.05); }
-</style>
-</head>
-<body>
-<div id="loading"><h1>Loading Universe...</h1></div>
-<div id="hud"><h2>Knowledge Graph Universe</h2><p id="status">Interactive 3D Semantic Map</p></div>
-<div id="canvas-container"></div>
-<button class="btn-explore" id="explore-btn">Launch Explorer</button>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-(function() {
-  const container = document.getElementById('canvas-container');
-  const status = document.getElementById('status');
-  const btn = document.getElementById('explore-btn');
-  
-  btn.onclick = () => {
-    status.innerText = "Exploring semantic nodes...";
-    status.style.color = "#38bdf8";
-    btn.innerText = "Explorer Active";
-    btn.style.background = "#22c55e";
-  };
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x0a0e1a);
-  container.appendChild(renderer.domElement);
-
-  const geometry = new THREE.SphereGeometry(1, 32, 32);
-  const material = new THREE.MeshPhongMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 0.5, wireframe: true });
-  const sphere = new THREE.Mesh(geometry, material);
-  scene.add(sphere);
-
-  const light = new THREE.PointLight(0xffffff, 1, 100);
-  light.position.set(10, 10, 10);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0x404040));
-
-  camera.position.z = 3;
-
-  function animate() {
-    requestAnimationFrame(animate);
-    sphere.rotation.x += 0.005;
-    sphere.rotation.y += 0.005;
-    renderer.render(scene, camera);
-  }
-  
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  setTimeout(() => {
-    document.getElementById('loading').style.opacity = '0';
-    setTimeout(() => document.getElementById('loading').style.display = 'none', 500);
-  }, 1500);
-
-  animate();
-})();
-</script>
-</body>
-</html>`,
+      type: "notes",
+      info: "The lineage of Srividya that begins the mantra with the letter '**Ka**' (representing Shiva/Brahma).",
       bibl: [],
       imageWidth: "100%",
       imageHeight: "100%",
@@ -131,17 +80,29 @@ body { color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI
       path: null
     },
     {
-      id: "commentary-demo",
-      label: "Commentary Demo",
+      id: "symbolic-elements-node",
+      label: "Symbolic Elements",
+      color: "#1a1a1a",
+      type: "html-node",
+      info: `<!DOCTYPE html> <html> <body style="background-color:#1a1a1a; color:#f0e68c; padding:10px; font-family:serif;"> <h3>Encoded Deities/Elements:</h3> <ul> <li><b>Shiva:</b> The letter 'Ka'</li> <li><b>Shakti:</b> The letter 'E'</li> <li><b>Kama:</b> The letter 'I'</li> <li><b>Kshiti (Earth):</b> The letter 'La'</li> <li><b>Hrim:</b> The Bija syllable ending each section.</li> </ul> </body> </html>`,
+      bibl: [],
+      imageWidth: "100%",
+      imageHeight: "100%",
+      visible: true,
+      path: null
+    },
+    {
+      id: "esoteric-commentary-node",
+      label: "Esoteric Commentary",
       color: "#e0f2fe",
       type: "fulltext",
-      info: "This is a demonstration of the [COMMENTARY | id='demo-comm']APA-style commentary feature[END COMMENTARY]. You can select any text in the editor and click 'Add Commentary' to create your own scholarly notes.",
+      info: "This is a demonstration of the [COMMENTARY | id='tantra-comm']Srividya Exegesis[/COMMENTARY]. Verse 32 is considered the \"Mantra Uddhara Sloka,\" providing the blueprint for the practitioner's meditation on the Devi's sound-body.",
       commentaries: [
         {
-          id: "demo-comm",
-          text: "This feature allows scholars to add deep insights directly to the text while maintaining academic standards.",
-          author: "Tor Arne Håve",
-          initials: "TAH",
+          id: "tantra-comm",
+          text: "The Srividya tradition emphasizes the identity between the mantra, the deity, and the practitioner's own consciousness.",
+          author: "Knowledge Editor",
+          initials: "KE",
           createdAt: new Date().toISOString()
         }
       ],
@@ -152,7 +113,13 @@ body { color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI
       path: null
     }
   ],
-  edges: []
+  edges: [
+    { id: "e1", source: "the-verse-node", target: "panchadashakshari-mantra-node", label: "Encodes" },
+    { id: "e2", source: "adi-shankara-node", target: "the-verse-node", label: "Authored" },
+    { id: "e3", source: "the-verse-node", target: "kadi-vidya-school-node", label: "Belongs To" },
+    { id: "e4", source: "panchadashakshari-mantra-node", target: "symbolic-elements-node", label: "Composed Of" },
+    { id: "e5", source: "the-verse-node", target: "esoteric-commentary-node", label: "Contains" }
+  ]
 };
 
 interface AppState {
@@ -181,7 +148,10 @@ interface AppState {
   isReorderModalOpen: boolean;
   isSEOModalOpen: boolean;
   isVersionHistoryModalOpen: boolean;
+  isTranslationModalOpen: boolean;
   seoStatus: 'idle' | 'generating' | 'success' | 'error';
+  translationStatus: 'idle' | 'translating' | 'success' | 'error';
+  translationProgress: number;
   seoUrl: string | null;
   newGraphTitle: string;
   newGraphMetaArea: string;
@@ -202,6 +172,7 @@ interface AppState {
   aiProvider: string;
   aiModel: string;
   availableModels: Record<string, { id: string; name: string; description?: string }[]>;
+  availableEndpoints: { path: string; method: string; summary?: string; description?: string }[];
 
   // Actions
   setDoc: (doc: KnowledgeDocument | ((prev: KnowledgeDocument) => KnowledgeDocument)) => void;
@@ -216,6 +187,7 @@ interface AppState {
   setIsReorderModalOpen: (isOpen: boolean) => void;
   setIsSEOModalOpen: (isOpen: boolean) => void;
   setIsVersionHistoryModalOpen: (isOpen: boolean) => void;
+  setIsTranslationModalOpen: (isOpen: boolean) => void;
   setNewGraphTitle: (title: string) => void;
   setNewGraphMetaArea: (area: string) => void;
   setDeleteConfirmationId: (id: string | null) => void;
@@ -247,10 +219,12 @@ interface AppState {
   restoreGraph: (trashId: string) => Promise<void>;
   restoreVersion: (version: number) => Promise<void>;
   askAI: (id: string, prompt: string) => Promise<void>;
+  translateGraph: (targetLanguage: string) => Promise<void>;
   generateSEODescription: (title: string) => Promise<string>;
   generateSEOKeywords: (title: string) => Promise<string>;
   publishSEOPage: (seoData: { slug: string; title: string; description: string; ogImage: string; keywords: string }) => Promise<void>;
   fetchAvailableModels: () => Promise<void>;
+  fetchEndpoints: () => Promise<void>;
   
   // Agent Actions
   createAgent: (agent: Omit<Agent, 'id' | 'createdAt'>) => Promise<void>;
@@ -261,7 +235,7 @@ interface AppState {
   generateAvatar: (name: string, description: string) => Promise<string>;
   
   // Node Operations
-  addNode: (type: NodeType) => void;
+  addNode: (type: NodeType, initialData?: Partial<Node>) => Node;
   saveNode: (updatedNode: Node) => void;
   deleteNode: (id: string) => void;
   toggleNodeVisibility: (id: string) => void;
@@ -293,7 +267,10 @@ export const useStore = create<AppState>()(
       isReorderModalOpen: false,
       isSEOModalOpen: false,
       isVersionHistoryModalOpen: false,
+      isTranslationModalOpen: false,
       seoStatus: 'idle',
+      translationStatus: 'idle',
+      translationProgress: 0,
       seoUrl: null,
       newGraphTitle: '',
       newGraphMetaArea: 'General',
@@ -310,6 +287,7 @@ export const useStore = create<AppState>()(
       aiProvider: 'gemini',
       aiModel: 'gemini-2.5-flash',
       availableModels: {},
+      availableEndpoints: [],
 
       setDoc: (updater) => {
         if (typeof updater === 'function') {
@@ -329,6 +307,7 @@ export const useStore = create<AppState>()(
       setIsReorderModalOpen: (isReorderModalOpen) => set({ isReorderModalOpen }),
       setIsSEOModalOpen: (isSEOModalOpen) => set({ isSEOModalOpen, seoStatus: 'idle', seoUrl: null }),
       setIsVersionHistoryModalOpen: (isVersionHistoryModalOpen) => set({ isVersionHistoryModalOpen }),
+      setIsTranslationModalOpen: (isTranslationModalOpen) => set({ isTranslationModalOpen, translationStatus: 'idle', translationProgress: 0 }),
       setNewGraphTitle: (newGraphTitle) => set({ newGraphTitle }),
       setNewGraphMetaArea: (newGraphMetaArea) => set({ newGraphMetaArea }),
       setDeleteConfirmationId: (deleteConfirmationId) => set({ deleteConfirmationId }),
@@ -724,6 +703,80 @@ export const useStore = create<AppState>()(
         }
       },
 
+      translateGraph: async (targetLanguage) => {
+        const { doc, aiProvider, aiModel, saveGraph } = get();
+        set({ translationStatus: 'translating', translationProgress: 0 });
+        
+        try {
+          const totalNodes = doc.nodes.length;
+          const translatedNodes = [];
+          
+          // 1. Translate Metadata Title
+          const titlePrompt = `Translate this title into ${targetLanguage}: "${doc.metadata.title}". Return ONLY the translated title.`;
+          const translatedTitle = await askGemini(titlePrompt, null, aiProvider, aiModel, "You are a professional translator.");
+          
+          // 2. Translate Nodes
+          for (let i = 0; i < totalNodes; i++) {
+            const node = doc.nodes[i];
+            
+            // Translate Label
+            const labelPrompt = `Translate this node label into ${targetLanguage}: "${node.label}". Return ONLY the translated label.`;
+            const translatedLabel = await askGemini(labelPrompt, null, aiProvider, aiModel, "You are a professional translator.");
+            
+            // Translate Info (with tag protection)
+            let translatedInfo = node.info;
+            if (node.info && node.type !== 'html-node') {
+              const infoPrompt = `Translate the following Markdown content into ${targetLanguage}. 
+              
+              CRITICAL: Do NOT translate or modify any text inside square brackets like [FANCY | ...], [SECTION | ...], [QUOTE | ...], [COMMENTARY | ...], or [YOUTUBE src=...]. 
+              Only translate the human-readable content surrounding these tags. 
+              Maintain all Markdown formatting.
+              
+              Content:
+              ${node.info}`;
+              
+              translatedInfo = await askGemini(infoPrompt, null, aiProvider, aiModel, "You are a professional translator specialized in technical Markdown and custom tags.");
+            }
+            
+            translatedNodes.push({
+              ...node,
+              label: translatedLabel.trim(),
+              info: translatedInfo
+            });
+            
+            set({ translationProgress: Math.round(((i + 1) / totalNodes) * 100) });
+          }
+          
+          // 3. Create New Graph
+          const newId = uuidv4();
+          const newDoc: KnowledgeDocument = {
+            ...doc,
+            metadata: {
+              ...doc.metadata,
+              title: `${translatedTitle.trim()} [${targetLanguage.toUpperCase()}]`,
+            },
+            nodes: translatedNodes
+          };
+          
+          // 4. Save and Switch
+          await knowledgeService.saveGraph(newId, newDoc, true);
+          set({ 
+            doc: newDoc, 
+            currentGraphId: newId, 
+            translationStatus: 'success',
+            viewMode: 'edit'
+          });
+          
+          // Refresh list
+          get().fetchGraphs();
+          
+          setTimeout(() => set({ translationStatus: 'idle', isTranslationModalOpen: false }), 3000);
+        } catch (e: any) {
+          console.error('Translation failed:', e);
+          set({ translationStatus: 'error', error: e.message || 'Translation failed' });
+        }
+      },
+
       generateSEODescription: async (title) => {
         const { doc } = get();
         // Extract some content from nodes for better context
@@ -912,6 +965,30 @@ export const useStore = create<AppState>()(
         }
       },
 
+      fetchEndpoints: async () => {
+        try {
+          const spec = await knowledgeService.fetchOpenApiSpec();
+          const endpoints: any[] = [];
+          
+          if (spec && spec.paths) {
+            Object.entries(spec.paths).forEach(([path, methods]: [string, any]) => {
+              Object.entries(methods).forEach(([method, details]: [string, any]) => {
+                endpoints.push({
+                  path,
+                  method: method.toUpperCase(),
+                  summary: details.summary,
+                  description: details.description
+                });
+              });
+            });
+          }
+          
+          set({ availableEndpoints: endpoints });
+        } catch (e) {
+          console.error('Failed to fetch endpoints:', e);
+        }
+      },
+
       // Agent Actions
       createAgent: async (agentData) => {
         const newAgent: Agent = {
@@ -936,8 +1013,8 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      sendAgentMessage: async (content) => {
-        const { activeAgentId, agents, agentMessages, doc } = get();
+      sendAgentMessage: async (content: string) => {
+        const { activeAgentId, agents } = get();
         const agent = agents.find((a) => a.id === activeAgentId);
         if (!agent) return;
 
@@ -946,61 +1023,162 @@ export const useStore = create<AppState>()(
           agentId: agent.id,
           role: 'user',
           content,
-          timestamp: new Date().toISOString(),
+          timestamp: Date.now(),
+          logs: []
         };
 
         set((state) => ({
           agentMessages: [...state.agentMessages, userMessage],
           isLoading: true,
+          error: null
         }));
 
+        const currentTurnLogs: AgentLog[] = [];
+        let currentMessages = get().agentMessages.filter(m => m.agentId === agent.id);
+        let finalResponse = "";
+        let steps = 0;
+        const maxSteps = 5;
+        let lastResponse = "";
+
         try {
-          const { doc } = get();
-          const messages = get().agentMessages.filter(m => m.agentId === agent.id);
-          const response = await chatWithAgent(agent, messages, doc);
-          
-          // Parse actions from response
-          const actionRegex = /\[ACTION:\s*({.*?})\]/g;
-          let match;
-          while ((match = actionRegex.exec(response)) !== null) {
-            try {
-              const action = JSON.parse(match[1]);
-              console.log('Agent Action:', action);
-              
-              if (action.type === 'ADD_NODE') {
-                get().addNode(action.nodeType || 'fulltext');
-              } else if (action.type === 'DELETE_NODE') {
-                get().deleteNode(action.id);
-              } else if (action.type === 'UPDATE_NODE') {
-                const node = get().doc.nodes.find(n => n.id === action.id);
-                if (node) {
-                  get().saveNode({ ...node, ...action.data });
+          while (steps < maxSteps) {
+            steps++;
+            const { doc } = get();
+            
+            // 1. Get agent response
+            const response = await chatWithAgent(agent, currentMessages, doc);
+            
+            // Loop detection: if response is identical to last one, break
+            if (response === lastResponse) break;
+            lastResponse = response;
+            
+            finalResponse = response;
+
+            // 2. Log thought
+            currentTurnLogs.push({
+              id: uuidv4(),
+              timestamp: Date.now(),
+              type: 'thought',
+              content: response.replace(/\[ACTION:[\s\S]*?\]/g, '').trim() || "Analyzing request..."
+            });
+
+            // 3. Parse and execute actions
+            const actionRegex = /\[ACTION:\s*({[\s\S]*?})\]/g;
+            let match;
+            const actionResults: string[] = [];
+            let hadActions = false;
+
+            while ((match = actionRegex.exec(response)) !== null) {
+              hadActions = true;
+              try {
+                const action = JSON.parse(match[1]);
+                currentTurnLogs.push({
+                  id: uuidv4(),
+                  timestamp: Date.now(),
+                  type: 'action',
+                  content: `Executing ${action.type}`,
+                  data: action
+                });
+                
+                let result = "Action completed successfully.";
+                
+                if (action.type === 'ADD_NODE') {
+                  const newNode = get().addNode(action.nodeType || 'fulltext', action.data);
+                  result = `Node added with ID: ${newNode.id}`;
+                } else if (action.type === 'DELETE_NODE') {
+                  get().deleteNode(action.id);
+                  result = `Node ${action.id} deleted.`;
+                } else if (action.type === 'UPDATE_NODE') {
+                  const node = get().doc.nodes.find(n => n.id === action.id);
+                  if (node) {
+                    get().saveNode({ ...node, ...action.data });
+                    result = `Node ${action.id} updated.`;
+                  } else {
+                    result = `Error: Node ${action.id} not found.`;
+                  }
+                } else if (action.type === 'UPDATE_METADATA') {
+                  get().updateMetadata(action.data);
+                  result = `Metadata updated.`;
+                } else if (action.type === 'SEARCH_GRAPHS') {
+                  set({ searchQuery: action.query, selectedMetaArea: action.metaArea || 'All', viewMode: 'graphs' });
+                  get().fetchGraphs();
+                  result = `Searching for "${action.query}" in ${action.metaArea || 'All'}.`;
+                } else if (action.type === 'LOAD_GRAPH') {
+                  get().loadGraph(action.id);
+                  result = `Graph ${action.id} loaded.`;
+                } else if (action.type === 'CREATE_GRAPH') {
+                  set({ newGraphTitle: action.title || 'New Graph', newGraphMetaArea: action.metaArea || 'General' });
+                  get().createNewGraph();
+                  result = `New graph "${action.title}" created.`;
+                } else if (action.type === 'LIST_META_AREAS') {
+                  set({ viewMode: 'graphs' });
+                  get().fetchGraphs();
+                  result = `Categories listed.`;
+                } else if (action.type === 'WORKER_AI') {
+                  const { endpoint, data } = action;
+                  const aiResult = await workerAIService.generateContent(endpoint, data);
+                  
+                  // Generic handler for any endpoint that returns content or url
+                  if (aiResult && (aiResult.content || aiResult.url) && data.nodeId) {
+                    const node = get().doc.nodes.find(n => n.id === data.nodeId);
+                    if (node) {
+                      const newInfo = aiResult.content || (aiResult.url ? `![Generated Asset](${aiResult.url})` : '');
+                      get().saveNode({ ...node, info: newInfo });
+                      result = `Worker AI content generated for node ${data.nodeId} via ${endpoint}.`;
+                    }
+                  } else if (endpoint === '/classifyGraph') {
+                    if (aiResult && aiResult.classification) {
+                      get().updateMetadata({ metaArea: aiResult.classification });
+                      result = `Graph classified as ${aiResult.classification}.`;
+                    }
+                  } else if (endpoint === '/patchGraphMetadata') {
+                    get().updateMetadata(data.metadata);
+                    result = `Metadata patched.`;
+                  } else {
+                    result = `Worker AI action on ${endpoint} completed. Result: ${JSON.stringify(aiResult).substring(0, 100)}...`;
+                  }
                 }
-              } else if (action.type === 'UPDATE_METADATA') {
-                get().updateMetadata(action.data);
-              } else if (action.type === 'SEARCH_GRAPHS') {
-                set({ searchQuery: action.query, selectedMetaArea: action.metaArea || 'All', viewMode: 'graphs' });
-                get().fetchGraphs();
-              } else if (action.type === 'LOAD_GRAPH') {
-                get().loadGraph(action.id);
-              } else if (action.type === 'CREATE_GRAPH') {
-                set({ newGraphTitle: action.title || 'New Graph', newGraphMetaArea: action.metaArea || 'General' });
-                get().createNewGraph();
-              } else if (action.type === 'LIST_META_AREAS') {
-                set({ viewMode: 'graphs' });
-                get().fetchGraphs(); // fetchGraphs also fetches meta areas
+
+                currentTurnLogs.push({
+                  id: uuidv4(),
+                  timestamp: Date.now(),
+                  type: 'result',
+                  content: result
+                });
+                actionResults.push(result);
+
+              } catch (e: any) {
+                const errorMsg = `Action Error: ${e.message}`;
+                currentTurnLogs.push({
+                  id: uuidv4(),
+                  timestamp: Date.now(),
+                  type: 'error',
+                  content: errorMsg
+                });
+                actionResults.push(errorMsg);
               }
-            } catch (e) {
-              console.error('Failed to parse agent action:', e);
             }
+
+            if (!hadActions) break;
+
+            // 4. Feed back to agent
+            const feedbackMessage: AgentMessage = {
+              id: uuidv4(),
+              agentId: agent.id,
+              role: 'user',
+              content: `ACTION RESULTS:\n${actionResults.join('\n')}\n\nPlease provide a final summary or next step.`,
+              timestamp: Date.now()
+            };
+            currentMessages = [...currentMessages, feedbackMessage];
           }
 
           const modelMessage: AgentMessage = {
             id: uuidv4(),
             agentId: agent.id,
-            role: 'model',
-            content: response,
-            timestamp: new Date().toISOString(),
+            role: 'assistant',
+            content: finalResponse,
+            timestamp: Date.now(),
+            logs: currentTurnLogs
           };
 
           set((state) => ({
@@ -1026,7 +1204,7 @@ export const useStore = create<AppState>()(
         return await generateAgentAvatar(name, description);
       },
 
-      addNode: (type) => {
+      addNode: (type, initialData) => {
         const newNode: Node = {
           id: uuidv4(),
           label: type === 'youtube-video' ? 'YouTube Video' : `New ${type} Section`,
@@ -1037,7 +1215,8 @@ export const useStore = create<AppState>()(
           imageWidth: '100%',
           imageHeight: '100%',
           visible: true,
-          path: null
+          path: null,
+          ...initialData
         };
         set((state) => ({
           doc: { ...state.doc, nodes: [...state.doc.nodes, newNode] },
@@ -1048,6 +1227,7 @@ export const useStore = create<AppState>()(
         if (get().currentGraphId) {
           get().saveGraph();
         }
+        return newNode;
       },
 
       saveNode: (updatedNode) => {

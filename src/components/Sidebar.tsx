@@ -1,5 +1,5 @@
 
-import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3 } from 'lucide-react';
+import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3, Globe } from 'lucide-react';
 import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
 import { useState } from 'react';
@@ -36,7 +36,8 @@ export default function Sidebar() {
     setActiveAgentId,
     setIsAgentModalOpen,
     setIsAgentChatOpen,
-    deleteAgent
+    deleteAgent,
+    setIsTranslationModalOpen
   } = useStore();
 
   const [showAiSettings, setShowAiSettings] = useState(false);
@@ -232,6 +233,15 @@ export default function Sidebar() {
                     <Code size={18} />
                   </div>
                   <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Edit JSON</span>
+                </button>
+                <button
+                  onClick={() => setIsTranslationModalOpen(true)}
+                  className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white dark:hover:bg-zinc-900 transition-all duration-200 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 hover:shadow-sm"
+                >
+                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    <Globe size={18} />
+                  </div>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Translate Graph</span>
                 </button>
               </div>
             </div>

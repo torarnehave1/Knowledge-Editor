@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Bot, Sparkles, Image as ImageIcon, Loader2, Upload } from 'lucide-react';
+import { X, Bot, Sparkles, Image as ImageIcon, Loader2, Upload, Plus, Trash2, Globe, Code, FileText } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { Agent } from '../types';
+import { Agent, ToolMapping } from '../types';
 
 export const AgentModal: React.FC = () => {
   const { 
@@ -14,7 +14,9 @@ export const AgentModal: React.FC = () => {
     agents, 
     activeAgentId,
     generateAvatar,
-    currentGraphId
+    currentGraphId,
+    availableEndpoints,
+    fetchEndpoints
   } = useStore();
 
   const editingAgent = agents.find(a => a.id === activeAgentId);
@@ -27,9 +29,16 @@ export const AgentModal: React.FC = () => {
   const [maxTurns, setMaxTurns] = useState(20);
   const [temperature, setTemperature] = useState(0.7);
   const [modalities, setModalities] = useState<string[]>(['text']);
+  const [toolMappings, setToolMappings] = useState<ToolMapping[]>([]);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isAgentModalOpen) {
+      fetchEndpoints();
+    }
+  }, [isAgentModalOpen]);
 
   useEffect(() => {
     if (editingAgent && isAgentModalOpen) {
@@ -41,6 +50,7 @@ export const AgentModal: React.FC = () => {
       setMaxTurns(editingAgent.maxTurns || 20);
       setTemperature(editingAgent.temperature || 0.7);
       setModalities(editingAgent.modalities || ['text']);
+      setToolMappings(editingAgent.toolMappings || []);
     } else if (isAgentModalOpen) {
       setName('');
       setDescription('');
@@ -50,6 +60,7 @@ export const AgentModal: React.FC = () => {
       setMaxTurns(20);
       setTemperature(0.7);
       setModalities(['text']);
+      setToolMappings([]);
     }
   }, [editingAgent, isAgentModalOpen]);
 
@@ -67,6 +78,7 @@ export const AgentModal: React.FC = () => {
         maxTurns,
         temperature,
         modalities,
+        toolMappings,
       });
     } else {
       await createAgent({
@@ -79,6 +91,7 @@ export const AgentModal: React.FC = () => {
         maxTurns,
         temperature,
         modalities,
+        toolMappings,
       });
     }
     setIsAgentModalOpen(false);
@@ -139,6 +152,25 @@ export const AgentModal: React.FC = () => {
     if (e.target.files && e.target.files.length > 0) {
       handleFile(e.target.files[0]);
     }
+  };
+
+  const addToolMapping = () => {
+    const newMapping: ToolMapping = {
+      id: Math.random().toString(36).substr(2, 9),
+      purpose: '',
+      endpoint: '',
+      method: 'POST',
+      description: ''
+    };
+    setToolMappings([...toolMappings, newMapping]);
+  };
+
+  const removeToolMapping = (id: string) => {
+    setToolMappings(toolMappings.filter(tm => tm.id !== id));
+  };
+
+  const updateToolMapping = (id: string, updates: Partial<ToolMapping>) => {
+    setToolMappings(toolMappings.map(tm => tm.id === id ? { ...tm, ...updates } : tm));
   };
 
   if (!isAgentModalOpen) return null;
@@ -260,6 +292,107 @@ export const AgentModal: React.FC = () => {
               <p className="mt-2 text-xs text-gray-400">
                 Tip: Be specific about how the agent should interpret the knowledge graph data.
               </p>
+            </div>
+
+            <div className="pt-6 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Custom Tool Mappings</h3>
+                  <p className="text-xs text-gray-500">Map specific API endpoints to agent purposes</p>
+                </div>
+                <button
+                  onClick={addToolMapping}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-medium"
+                >
+                  <Plus size={14} />
+                  Add Tool
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {toolMappings.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                    <Code className="mx-auto text-gray-300 mb-2" size={32} />
+                    <p className="text-xs text-gray-400">No custom tools defined yet.</p>
+                  </div>
+                ) : (
+                  toolMappings.map((tm) => (
+                    <div key={tm.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Purpose</label>
+                            <input
+                              type="text"
+                              value={tm.purpose}
+                              onChange={(e) => updateToolMapping(tm.id, { purpose: e.target.value })}
+                              placeholder="e.g. Generate Summary"
+                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Endpoint</label>
+                            <select
+                              value={tm.endpoint}
+                              onChange={(e) => {
+                                const endpoint = availableEndpoints.find(ep => ep.path === e.target.value);
+                                updateToolMapping(tm.id, { 
+                                  endpoint: e.target.value,
+                                  method: endpoint?.method as any || 'POST',
+                                  description: endpoint?.summary || endpoint?.description || ''
+                                });
+                              }}
+                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none font-mono bg-white"
+                            >
+                              <option value="">Select an endpoint...</option>
+                              {availableEndpoints.map(ep => (
+                                <option key={`${ep.method}-${ep.path}`} value={ep.path}>
+                                  {ep.path} ({ep.method})
+                                </option>
+                              ))}
+                              {tm.endpoint && !availableEndpoints.find(ep => ep.path === tm.endpoint) && (
+                                <option value={tm.endpoint}>{tm.endpoint}</option>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeToolMapping(tm.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Method</label>
+                          <select
+                            value={tm.method}
+                            onChange={(e) => updateToolMapping(tm.id, { method: e.target.value as any })}
+                            className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                          >
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                          </select>
+                        </div>
+                        <div className="col-span-3">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={tm.description}
+                            onChange={(e) => updateToolMapping(tm.id, { description: e.target.value })}
+                            placeholder="Briefly describe what this tool does"
+                            className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">

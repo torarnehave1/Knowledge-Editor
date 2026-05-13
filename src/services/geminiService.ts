@@ -72,6 +72,9 @@ export async function askGemini(
     }
 
     const userToken = localStorage.getItem('emailVerificationToken');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
     const response = await fetch(VEGVISR_API_URL, {
       method: 'POST',
@@ -79,8 +82,11 @@ export async function askGemini(
         'Content-Type': 'application/json',
         'X-API-Token': userToken || '',
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -60,6 +60,14 @@ export interface KnowledgeDocument {
   edges: any[];
 }
 
+export interface ToolMapping {
+  id: string;
+  purpose: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+  description: string;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -72,12 +80,22 @@ export interface Agent {
   maxTurns?: number;
   temperature?: number;
   modalities?: string[]; // e.g., ['text', 'image', 'video']
+  toolMappings?: ToolMapping[];
+}
+
+export interface AgentLog {
+  id: string;
+  timestamp: number;
+  type: 'thought' | 'action' | 'result' | 'error';
+  content: string;
+  data?: any;
 }
 
 export interface AgentMessage {
   id: string;
   agentId: string;
-  role: 'user' | 'model';
+  role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  timestamp: number;
+  logs?: AgentLog[];
 }

@@ -318,5 +318,18 @@ export const knowledgeService = {
     });
     if (!response.ok) throw new Error('Failed to generate SEO page');
     return await response.json();
+  },
+
+  async fetchOpenApiSpec(): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/openapi.json`);
+      if (response.ok) return await response.json();
+    } catch (e) {
+      console.warn('Failed to fetch openapi.json, trying openaiapi.json');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/openaiapi.json`);
+    if (!response.ok) throw new Error('Failed to fetch OpenAPI spec from both common locations');
+    return await response.json();
   }
 };

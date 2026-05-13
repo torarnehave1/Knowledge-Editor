@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, X, Bot, Trash2, Maximize2, Minimize2, Loader2, User, Key, ShieldAlert } from 'lucide-react';
+import { Send, X, Bot, Trash2, Maximize2, Minimize2, Loader2, User, Key, ShieldAlert, ChevronDown, ChevronUp, Terminal, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { AgentLog } from '../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -22,10 +23,24 @@ export const AgentChat: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
+  const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeAgent = agents.find(a => a.id === activeAgentId);
   const messages = agentMessages.filter(m => m.agentId === activeAgentId);
+
+  const toggleLogs = (messageId: string) => {
+    setExpandedLogs(prev => ({ ...prev, [messageId]: !prev[messageId] }));
+  };
+
+  const renderLogIcon = (type: AgentLog['type']) => {
+    switch (type) {
+      case 'thought': return <Terminal size={12} className="text-indigo-400" />;
+      case 'action': return <Activity size={12} className="text-amber-400" />;
+      case 'result': return <CheckCircle2 size={12} className="text-emerald-400" />;
+      case 'error': return <AlertCircle size={12} className="text-rose-400" />;
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -139,12 +154,73 @@ export const AgentChat: React.FC = () => {
                     ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100' 
                     : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none shadow-sm'
                 }`}>
-                  <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-800 prose-pre:text-gray-100">
+                  {/* Logs Section */}
+                  {m.logs && m.logs.length > 0 && (
+                    <div className="mb-3 border-b border-gray-100 pb-2">
+                      <div className="flex items-center justify-between">
+                        <button 
+                          onClick={() => toggleLogs(m.id)}
+                          className="flex items-center gap-2 text-[10px] font-bold text-indigo-600 uppercase tracking-wider hover:text-indigo-700 transition-colors"
+                        >
+                          {expandedLogs[m.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          Agent Execution Trace ({m.logs.length} steps)
+                        </button>
+                        {expandedLogs[m.id] && (
+                          <button
+                            onClick={() => {
+                              const trace = m.logs?.map(l => `[${l.type.toUpperCase()}] ${l.content}${l.data ? '\n' + JSON.stringify(l.data, null, 2) : ''}`).join('\n\n');
+                              navigator.clipboard.writeText(trace || '');
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1"
+                          >
+                            Copy Trace
+                          </button>
+                        )}
+                      </div>
+                      
+                      <AnimatePresence>
+                        {expandedLogs[m.id] && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="mt-2 space-y-1.5 overflow-hidden"
+                          >
+                            {m.logs.map((log) => (
+                              <div key={log.id} className="flex gap-2 items-start bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                <div className="mt-0.5">{renderLogIcon(log.type)}</div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[10px] font-bold text-gray-400 uppercase flex justify-between">
+                                    <span>{log.type}</span>
+                                    <span>{new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                  </div>
+                                  <div className="text-[11px] text-gray-700 break-words font-mono leading-tight">
+                                    {log.content}
+                                  </div>
+                                  {log.data && (
+                                    <pre className="mt-1 p-1 bg-gray-900 text-[9px] text-indigo-300 rounded overflow-x-auto">
+                                      {JSON.stringify(log.data, null, 2)}
+                                    </pre>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  <div className={`prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-800 prose-pre:text-gray-100 ${
+                    m.role === 'user' ? 'prose-invert' : ''
+                  }`}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {m.content}
                     </ReactMarkdown>
                   </div>
-                  <div className={`text-[10px] mt-1 opacity-50 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  <div className={`text-[10px] mt-1 ${
+                    m.role === 'user' ? 'text-indigo-100 opacity-80 text-right' : 'text-gray-400 text-left'
+                  }`}>
                     {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>

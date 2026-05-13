@@ -13,6 +13,7 @@ import NodeRenderer from './components/NodeRenderer';
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { TranslationModal } from './components/TranslationModal';
 import { AgentModal } from './components/AgentModal';
 import { AgentChat } from './components/AgentChat';
 import { Login } from './components/Login';
@@ -144,6 +145,11 @@ export default function App() {
     }
   };
 
+  const stripTags = (text: string) => {
+    if (!text) return '';
+    return text.replace(/!\[YOUTUBE.*?\]|\[END YOUTUBE\]|\[COMMENTARY.*?\]|\[END COMMENTARY\]|\[QUOTE.*?\]|\[END QUOTE\]|\[SECTION.*?\]|\[END SECTION\]|\[FANCY.*?\]|\[END FANCY\]/gi, '').trim();
+  };
+
   const editingNode = doc.nodes.find(n => n.id === editingNodeId);
 
   if (isViewMode) {
@@ -175,7 +181,7 @@ export default function App() {
                 .map((node) => (
                   <div key={node.id} className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                      <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{node.label}</h3>
+                      <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
                     </div>
                     <NodeRenderer node={node} />
                   </div>
@@ -676,7 +682,7 @@ export default function App() {
                       <div className="flex justify-between items-start mb-6">
                         <div className="flex items-center gap-3">
                           <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
-                          <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{node.label}</h3>
+                          <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
                         </div>
                         {viewMode === 'edit' && (
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -732,6 +738,9 @@ export default function App() {
 
       {/* Version History Modal */}
       <VersionHistoryModal />
+
+      {/* Translation Modal */}
+      <TranslationModal />
 
       <AgentModal />
       <AgentChat />

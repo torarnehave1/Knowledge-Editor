@@ -12,20 +12,15 @@ import { askGemini } from "./geminiService";
 function formatGraphContext(doc: KnowledgeDocument): string {
   if (!doc || !doc.nodes) return "No graph data available.";
   
-  const nodes = doc.nodes.map(n => `- ${n.label} (${n.type}): ${n.info?.substring(0, 200) || 'No content'}`).join('\n');
+  // Only include essential info to save tokens
+  const nodes = doc.nodes.map(n => `- ID: ${n.id}, Label: ${n.label}, Type: ${n.type}`).join('\n');
   const edges = (doc.edges || []).map(e => `- ${e.source} -> ${e.target} (${e.label || 'related'})`).join('\n');
   
   return `
-Current Knowledge Graph Context:
+GRAPH CONTEXT:
 Title: ${doc.metadata?.title || 'Untitled'}
-Description: ${doc.metadata?.description || 'No description'}
-Meta Area (Category): ${doc.metadata?.metaArea || 'None'}
-Created By: ${doc.metadata?.createdBy || 'Unknown'}
-Version: ${doc.metadata?.version || 0}
-
 Nodes:
 ${nodes}
-
 Edges:
 ${edges}
   `.trim();
@@ -49,221 +44,69 @@ AGENT SETTINGS:
 - Modalities: ${agent.modalities?.join(', ') || 'text'}
 `;
 
+  const toolMappingsContext = agent.toolMappings && agent.toolMappings.length > 0
+    ? `
+CUSTOM TOOL MAPPINGS:
+${agent.toolMappings.map(tm => `- Purpose: ${tm.purpose}\n  Endpoint: ${tm.endpoint}\n  Method: ${tm.method}\n  Description: ${tm.description}`).join('\n')}
+
+To use a custom tool, use the WORKER_AI action with the specified endpoint.
+`
+    : "";
+
   const systemInstruction = `
 ${agent.systemInstruction}
 
 ${agentSettingsContext}
+${toolMappingsContext}
 
-CAPABILITIES:
-- You are powered by Google Gemini.
-- You can generate text, images, and video.
-- You can manage the knowledge graph (add/update/delete sections).
-- You can search for other graphs and list categories.
-- You can use various AI models (Gemini, Grok, etc.) for text, images, and video.
-- You can execute actions automatically using the [ACTION: ...] blocks.
+You are a Knowledge Graph Action Agent. 
+Your purpose is to execute actions on the graph based on user requests.
 
-You have knowledge of the Knowledge Graph Worker API (https://knowledge.vegvisr.org).
-Available endpoints and their full capacity:
-- GET /health: Checks the operational status of the API.
-- GET /openapi.json: Retrieves the full OpenAPI specification.
-- PATCH /patchGraphMetadata: Updates the graph's metadata. Accepts a JSON body with fields like 'title', 'description', and 'seo_metadata'.
-- POST /classifyGraph: Analyzes the current graph structure and returns a classification or categorization.
-- POST /generate-worker-ai: Triggers advanced AI-driven content generation for graph nodes. Accepts parameters for prompt, context, and model selection.
-- POST /chat: General AI chat endpoint for graph-related queries.
-- POST /generate-image: Generates images based on graph context.
-- POST /generate-video: Generates videos based on graph context.
-- POST /generate-audio: Generates audio based on graph context.
-- POST /generate-tts: Generates text-to-speech based on graph context.
-- POST /generate-veo: Generates high-quality video using Veo models.
-- POST /generate-imagen: Generates high-quality images using Imagen models.
-- POST /generate-flash-image: Generates images using Gemini Flash Image models.
-- POST /generate-flash-audio: Generates audio using Gemini Flash Audio models.
-- POST /generate-flash-video: Generates video using Gemini Flash Video models.
-- POST /generate-flash-tts: Generates text-to-speech using Gemini Flash TTS models.
-- POST /generate-flash-native-audio: Generates native audio using Gemini Flash Native Audio models.
-- POST /generate-flash-native-video: Generates native video using Gemini Flash Native Video models.
-- POST /generate-flash-native-tts: Generates native text-to-speech using Gemini Flash Native TTS models.
-- POST /generate-flash-native-veo: Generates native video using Gemini Flash Native Veo models.
-- POST /generate-flash-native-imagen: Generates native images using Gemini Flash Native Imagen models.
-- POST /generate-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Image models.
-- POST /generate-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Video models.
-- POST /generate-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-image: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Image models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-audio: Generates native audio using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Audio models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-video: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Video models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-tts: Generates native text-to-speech using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native TTS models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-veo: Generates native video using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Veo models.
-- POST /generate-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-flash-native-imagen: Generates native images using Gemini Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Flash Native Imagen models.
+GUIDELINES:
+1. If actions are needed, state what you are doing and provide the [ACTION: ...] block.
+2. If you receive "ACTION RESULTS", review them. DO NOT repeat an action that was already successful.
+3. Once all requested actions are completed and successful, provide a concise summary of what was done and STOP.
+4. DO NOT use conversational filler like "Hello" or "How can I help".
+5. Be extremely concise and technical.
+6. For YouTube videos, use 'youtube-video' nodeType and set the URL in the 'path' field.
+7. Do NOT include YouTube tags like ![YOUTUBE...] in the node 'label'. Use a clean title.
+8. If using YOUTUBE tags in 'info', use format: ![YOUTUBE src=URL]TITLE[END YOUTUBE]
+9. If you encounter a YOUTUBE tag in a label, remove it and move it to the info field if appropriate.
 
-GRAPH MANAGEMENT:
-- You can search for existing graphs to use as reference or inspiration.
-- You can create new graphs from scratch.
-- You can load any graph if you have its ID.
+API REFERENCE (https://knowledge.vegvisr.org):
+- GET /openapi.json: Full API spec.
+- POST /generate-worker-ai: Advanced content generation.
+- POST /classifyGraph: Graph analysis.
+- PATCH /patchGraphMetadata: Metadata updates.
+- POST /chat: General AI chat.
+- POST /generate-image: Image generation.
+- POST /generate-video: Video generation.
+- POST /generate-audio: Audio generation.
+- POST /generate-tts: Text-to-speech.
 
-SELF-REPORTING:
-- If a user asks about your capabilities, what you can do, or how you work, you MUST mention BOTH your local and global capabilities.
-- LOCAL: Managing the current knowledge graph (adding/updating/deleting sections/nodes, changing title/description).
-- GLOBAL: Searching the entire database for other graphs, listing categories (meta areas), and creating brand new graphs from scratch.
-- AI MODELS: Mention that you can generate content using Gemini, Grok, and other models for text, images, and video.
-- ACTIONS: Explain that you use [ACTION: ...] blocks to execute these commands automatically.
+ACTIONS (MANDATORY):
+1. Add node: [ACTION: {"type": "ADD_NODE", "nodeType": "fulltext", "data": {"label": "New Label", "info": "Initial content..."}}]
+   (nodeTypes: 'fulltext', 'youtube-video', 'image', 'audio', 'video')
+2. Delete node: [ACTION: {"type": "DELETE_NODE", "id": "NODE_ID"}]
+3. Update node: [ACTION: {"type": "UPDATE_NODE", "id": "NODE_ID", "data": {"label": "New Label", "info": "New content..."}}]
+4. Update metadata: [ACTION: {"type": "UPDATE_METADATA", "data": {"title": "New Title", "description": "New description..."}}]
+5. Search graphs: [ACTION: {"type": "SEARCH_GRAPHS", "query": "term", "metaArea": "Category"}]
+6. Load graph: [ACTION: {"type": "LOAD_GRAPH", "id": "GRAPH_ID"}]
+7. Create graph: [ACTION: {"type": "CREATE_GRAPH", "title": "Title", "metaArea": "Area"}]
+8. List categories: [ACTION: {"type": "LIST_META_AREAS"}]
+9. Worker AI: [ACTION: {"type": "WORKER_AI", "endpoint": "ENDPOINT", "data": {...}}]
+   (Example: [ACTION: {"type": "WORKER_AI", "endpoint": "/generate-worker-ai", "data": {"nodeId": "NODE_ID", "prompt": "..."}}])
 
-DOCUMENTATION:
-- If a user asks for documentation, technical details, or how to use the API:
-  - Technical API Documentation: Point them to the OpenAPI specification at https://knowledge.vegvisr.org/openapi.json.
-  - Google Gemini API: Explain that you are powered by Google Gemini and provide the official documentation link: https://ai.google.dev/docs.
-  - SDK Documentation: Mention the @google/genai SDK used for communication: https://www.npmjs.com/package/@google/genai.
-  - User Guide: Offer to create a "User Guide" section in their current graph or a new "Agent Documentation" graph.
-  - Capabilities: Refer them back to your self-reporting summary.
-
-ACTIONS:
-You can perform actions on the knowledge graph by including a special JSON block at the end of your message.
-The user often refers to "nodes" as "sections". When they ask to "add a section", "delete a section", or "update a section", use the corresponding node action.
-
-Available actions:
-1. Add a new node (section):
-   [ACTION: {"type": "ADD_NODE", "nodeType": "fulltext"}]
-   (Supported nodeTypes: 'fulltext', 'youtube-video', 'image', 'audio', 'video')
-
-2. Delete a node (section):
-   [ACTION: {"type": "DELETE_NODE", "id": "NODE_ID"}]
-
-3. Update a node's (section's) content:
-   [ACTION: {"type": "UPDATE_NODE", "id": "NODE_ID", "data": {"label": "New Label", "info": "New content..."}}]
-
-4. Update graph metadata (title/description):
-   [ACTION: {"type": "UPDATE_METADATA", "data": {"title": "New Title", "description": "New description..."}}]
-
-5. Search for existing graphs:
-   [ACTION: {"type": "SEARCH_GRAPHS", "query": "search term", "metaArea": "Optional Category"}]
-
-6. Load a specific graph by ID:
-   [ACTION: {"type": "LOAD_GRAPH", "id": "GRAPH_ID"}]
-
-7. Create a new empty graph:
-   [ACTION: {"type": "CREATE_GRAPH", "title": "New Graph Title", "metaArea": "General"}]
-
-8. List all available meta areas (categories):
-   [ACTION: {"type": "LIST_META_AREAS"}]
-
-When a user asks you to "add a section" or "add a node", you should explain what you are doing and then include the [ACTION: ...] block.
-Always use the current graph context to find the correct NODE_ID for updates or deletions.
-
-CONTEXT:
-You are an AI Agent with access to a specific knowledge graph. Use the following graph data as your single source of truth when answering questions. If the information is not in the graph, you can use your general knowledge but prioritize the graph content.
+CRITICAL:
+- Use NODE_IDs from the GRAPH CONTEXT below.
+- If a change is requested, you MUST use an ACTION block.
+- Be extremely concise. NO conversational filler.
 
 ${graphContext}
   `.trim();
 
   const history = messages.map(m => ({
-    role: m.role === 'model' ? 'assistant' : 'user',
+    role: m.role === 'assistant' ? 'assistant' : 'user',
     content: m.content
   }));
 
@@ -271,36 +114,65 @@ ${graphContext}
   const maxTurns = agent.maxTurns || 20; // Default to 20 turns
   const limitedHistory = history.slice(-maxTurns);
 
-  // Inject context as the first message if it's a new conversation or ensure it's present
-  if (limitedHistory.length > 0 && limitedHistory[0].role === 'user') {
-    limitedHistory[0].content = `[CONTEXT: The following is the current state of my knowledge graph. Please use this as your primary reference.]\n\n${graphContext}\n\n---\n\nUSER QUESTION: ${limitedHistory[0].content}`;
+  // The graph context is already in the system instruction for every turn.
+  // We don't need to inject it into the user message as well, which saves tokens.
+  const lastUserMessage = [...limitedHistory].reverse().find(m => m.role === 'user');
+
+  let currentHistory = limitedHistory;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+  
+  if (apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: agent.model || "gemini-3-flash-preview",
+        contents: currentHistory.map(m => ({ 
+          role: m.role === 'assistant' ? 'model' : 'user', 
+          parts: [{ text: m.content }] 
+        })),
+        config: { 
+          systemInstruction,
+          temperature: agent.temperature || 0.7
+        }
+      });
+      return response.text || "I'm sorry, I couldn't generate a response.";
+    } catch (sdkError: any) {
+      console.error("Direct SDK chat failed:", sdkError);
+      // If it's a token limit error, we might still want to retry with less history
+      if (sdkError.message?.toLowerCase().includes('token') || sdkError.message?.toLowerCase().includes('limit')) {
+        const reducedHistory = currentHistory.slice(Math.floor(currentHistory.length / 2));
+        if (reducedHistory.length < currentHistory.length) {
+          return chatWithAgent(agent, messages, graphData); // Recursive retry with reduced history
+        }
+      }
+      // Fallback to proxy if SDK fails for other reasons
+    }
   }
 
   try {
-    // Use the proxy service
+    // Use the proxy service as fallback or if no key
     const response = await askGemini(
       "", 
       null, 
       "gemini", 
       agent.model || "gemini-3-flash-preview", 
       systemInstruction, 
-      limitedHistory,
+      currentHistory,
       agent.temperature
     );
     return response || "I'm sorry, I couldn't generate a response.";
-  } catch (error) {
-    console.error("Agent proxy chat failed, attempting direct fallback if key exists:", error);
+  } catch (error: any) {
+    console.error(`Agent proxy chat attempt ${attempts + 1} failed:`, error);
     
-    // Fallback to direct SDK only if a key is available
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-    if (apiKey) {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
-        config: { systemInstruction }
-      });
-      return response.text || "I'm sorry, I couldn't generate a response.";
+    // If it's a token limit error, try again with less history
+    if (error.message?.toLowerCase().includes('token') || error.message?.toLowerCase().includes('limit')) {
+      const reducedHistory = currentHistory.slice(Math.floor(currentHistory.length / 2));
+      if (reducedHistory.length < currentHistory.length) {
+        return chatWithAgent(agent, messages, graphData); // Recursive retry with reduced history
+      }
     }
     throw error;
   }

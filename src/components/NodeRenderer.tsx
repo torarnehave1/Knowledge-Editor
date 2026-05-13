@@ -53,8 +53,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   };
 
   const getYouTubeId = (url: string) => {
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/);
-    return match ? match[1] : null;
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
   };
 
   if (node.type === 'audio' && node.path) {
@@ -194,12 +196,14 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
   if (node.type === 'youtube-video' && node.path) {
     const videoId = getYouTubeId(node.path);
-    if (videoId) {
+    const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : (node.path.includes('embed') ? node.path : null);
+    
+    if (embedUrl) {
       return (
         <div className="space-y-4">
           <div className="w-full aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
             <iframe
-              src={`https://www.youtube.com/embed/${videoId}`}
+              src={embedUrl}
               title={node.label}
               className="w-full h-full border-none"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
