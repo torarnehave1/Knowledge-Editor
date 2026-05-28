@@ -7,6 +7,13 @@ import { askGemini } from '../services/geminiService';
 import { chatWithAgent, generateAgentAvatar } from '../services/agentService';
 import { workerAIService } from '../services/workerAIService';
 
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return uuidv4();
+};
+
 export type ViewMode = 'edit' | 'preview' | 'json' | 'graphs';
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -565,7 +572,7 @@ export const useStore = create<AppState>()(
       saveGraph: async (id) => {
         const targetId = id || get().currentGraphId;
         if (!targetId) {
-          const newId = uuidv4();
+          const newId = generateUUID();
           set({ currentGraphId: newId });
           return get().saveGraph(newId);
         }
@@ -586,7 +593,7 @@ export const useStore = create<AppState>()(
         const { newGraphTitle, newGraphMetaArea } = get();
         if (!newGraphTitle.trim()) return;
 
-        const newId = uuidv4();
+        const newId = generateUUID();
         const newDoc: KnowledgeDocument = {
           metadata: {
             title: newGraphTitle,
@@ -748,7 +755,7 @@ export const useStore = create<AppState>()(
           }
           
           // 3. Create New Graph
-          const newId = uuidv4();
+          const newId = generateUUID();
           const newDoc: KnowledgeDocument = {
             ...doc,
             metadata: {
