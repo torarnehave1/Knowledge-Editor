@@ -267,6 +267,55 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return `\n\n<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden"><div class="mb-3 leading-relaxed break-words">\n\n${text}\n\n</div><cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite></blockquote>\n\n`;
     });
 
+    // Handle [FLEXBOX-CARDS] / [FLEXBOX-CARDS-N] ... [END FLEXBOX]
+    // Card syntax (parity with vegvisr-frontend FlexboxCards.vue): a standalone
+    // **Title** line starts a card, ![alt](url) is the card image, other lines
+    // become the card text.
+    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    processed = processed.replace(/\[FLEXBOX-CARDS(?:-(\d+))?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, cols, body) => {
+      const columnCount = Math.min(Math.max(parseInt(cols, 10) || 3, 1), 6);
+      const cards: { title: string; image: string; imageAlt: string; text: string }[] = [];
+      let current = { title: '', image: '', imageAlt: '', text: '' };
+      let started = false;
+      for (const rawLine of body.split('\n')) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const titleMatch = line.match(/^\*\*(.+?)\*\*$/);
+        if (titleMatch) {
+          if (started && (current.title || current.image || current.text)) cards.push({ ...current });
+          current = { title: titleMatch[1], image: '', imageAlt: '', text: '' };
+          started = true;
+          continue;
+        }
+        const imageMatch = line.match(/!\[([^\]]*?)\]\(([^)]+)\)/);
+        if (imageMatch && started) {
+          current.imageAlt = imageMatch[1];
+          current.image = imageMatch[2];
+          continue;
+        }
+        if (started) current.text += (current.text ? ' ' : '') + line;
+      }
+      if (started && (current.title || current.image || current.text)) cards.push(current);
+      if (cards.length === 0) return '';
+
+      const cardWidth = `flex: 0 1 calc(${(100 / columnCount).toFixed(3)}% - 20px); max-width: calc(${(100 / columnCount).toFixed(3)}% - 20px); min-width: 220px;`;
+      const cardsHtml = cards.map((c) => {
+        const img = c.image
+          ? `<img src="${c.image}" alt="${escapeHtml(c.imageAlt)}" class="w-full h-[200px] object-cover rounded-lg mb-4" style="margin:0;" />`
+          : '';
+        const title = c.title ? `<h4 class="text-lg font-semibold mb-3" style="margin:0 0 12px 0;">${escapeHtml(c.title)}</h4>` : '';
+        const text = c.text ? `<div class="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed text-left w-full">${escapeHtml(c.text)}</div>` : '';
+        return `<div class="bg-white dark:bg-zinc-900 rounded-xl p-5 shadow-md border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center" style="${cardWidth}">${img}${title}${text}</div>`;
+      }).join('');
+      return `\n\n<div class="flex flex-wrap justify-center my-8" style="gap: 20px;">${cardsHtml}</div>\n\n`;
+    });
+
+    // Handle remaining FLEXBOX variants (FLEXBOX, -GRID, -GALLERY, -ROW) as a
+    // wrapping flex row; inner markdown (images) still parsed by the renderer.
+    processed = processed.replace(/\[FLEXBOX(?:-(?:GRID|GALLERY|ROW))?(?:\s*\|[^\]]*)?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, body) => {
+      return `\n\n<div class="flex flex-wrap gap-4 justify-center items-center my-6">\n\n${body}\n\n</div>\n\n`;
+    });
+
     // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
     processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
       return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">\n\n${text}\n\n</div></div>\n\n`;
