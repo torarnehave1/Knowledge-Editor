@@ -264,12 +264,12 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
     // Handle [QUOTE | Cited='...']...[END QUOTE]
     processed = processed.replace(/\[QUOTE\s*\|\s*Cited\s*=\s*['"]?(.*?)['"]?\]([\s\S]*?)\[END QUOTE\]/gi, (_, cited, text) => {
-      return `\n\n<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden"><div class="mb-3 leading-relaxed break-words">${text}</div><cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite></blockquote>\n\n`;
+      return `\n\n<blockquote class="border-l-4 border-indigo-500 pl-6 my-8 italic text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 py-6 pr-8 rounded-r-3xl shadow-sm overflow-hidden"><div class="mb-3 leading-relaxed break-words">\n\n${text}\n\n</div><cite class="block mt-3 text-sm font-bold text-indigo-600 dark:text-indigo-400 not-italic uppercase tracking-wider">— ${cited}</cite></blockquote>\n\n`;
     });
 
     // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
     processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
-      return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">${text}</div></div>\n\n`;
+      return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">\n\n${text}\n\n</div></div>\n\n`;
     });
 
     // Handle [FANCY | font-size:...; color:...; background-image:url('...')]...[END FANCY]
@@ -295,10 +295,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       const styleString = Object.entries(styleObj).map(([k, v]) => `${k.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}: ${v}`).join('; ');
 
       if (hasBgImage) {
-        return `\n\n<div class="p-12 my-10 rounded-[2.5rem] bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[400px] relative overflow-hidden shadow-2xl border border-white/10" style="${styleString}"><div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div><div class="relative z-10 w-full max-w-4xl mx-auto p-12 rounded-[2rem] prose-invert drop-shadow-2xl"><div class="text-white break-words overflow-wrap-anywhere">${text}</div></div></div>\n\n`;
+        return `\n\n<div class="p-12 my-10 rounded-[2.5rem] bg-cover bg-center flex flex-col justify-center items-center text-center min-h-[400px] relative overflow-hidden shadow-2xl border border-white/10" style="${styleString}"><div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div><div class="relative z-10 w-full max-w-4xl mx-auto p-12 rounded-[2rem] prose-invert drop-shadow-2xl"><div class="text-white break-words overflow-wrap-anywhere">\n\n${text}\n\n</div></div></div>\n\n`;
       } else {
         // Simple styled container for cases like large characters or highlighted text
-        return `\n\n<div class="p-8 my-6 rounded-3xl flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50" style="${styleString}"><div class="break-words overflow-wrap-anywhere">${text}</div></div>\n\n`;
+        return `\n\n<div class="p-8 my-6 rounded-3xl flex flex-col justify-center items-center text-center relative overflow-hidden shadow-sm border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50" style="${styleString}"><div class="break-words overflow-wrap-anywhere">\n\n${text}\n\n</div></div>\n\n`;
       }
     });
 
