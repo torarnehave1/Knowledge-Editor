@@ -6,7 +6,7 @@ import { twMerge } from 'tailwind-merge';
 
 import { Node, NodeType, User } from './types';
 import { VALID_NODE_TYPES } from './constants';
-import { EcosystemNav } from 'vegvisr-ui-kit';
+import { ScreenRecorder } from 'vegvisr-ui-kit';
 import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
@@ -199,7 +199,9 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
-      <EcosystemNav className="flex-shrink-0 border-b border-slate-800 bg-slate-900 px-4 py-2 text-slate-100 z-50" />
+      <div className="flex-shrink-0 flex items-center justify-end border-b border-slate-800 bg-slate-900 px-4 py-2 text-slate-100 z-50">
+        <ScreenRecorder />
+      </div>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
 
