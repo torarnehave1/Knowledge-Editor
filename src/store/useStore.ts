@@ -291,8 +291,8 @@ export const useStore = create<AppState>()(
       activeAgentId: null,
       isAgentModalOpen: false,
       isAgentChatOpen: false,
-      aiProvider: 'gemini',
-      aiModel: 'gemini-2.5-flash',
+      aiProvider: 'gemma',
+      aiModel: '@cf/google/gemma-4-26b-a4b-it',
       availableModels: {},
       availableEndpoints: [],
 
@@ -938,10 +938,15 @@ export const useStore = create<AppState>()(
           const models = data.models || {};
           set({ availableModels: models });
           
-          // Set initial model if not set
+          // Migrate persisted provider/model no longer offered by the backend
           const { aiProvider, aiModel } = get();
-          if (!aiModel && models[aiProvider]) {
-            set({ aiModel: models[aiProvider][0]?.id });
+          if (!models[aiProvider]) {
+            const firstProvider = Object.keys(models)[0];
+            if (firstProvider) {
+              set({ aiProvider: firstProvider, aiModel: models[firstProvider][0]?.id || '' });
+            }
+          } else if (!aiModel || !models[aiProvider].some((m: any) => m.id === aiModel)) {
+            set({ aiModel: models[aiProvider][0]?.id || '' });
           }
         } catch (e) {
           console.error('Failed to fetch models:', e);
