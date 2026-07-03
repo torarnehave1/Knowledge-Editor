@@ -303,9 +303,69 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     );
   }
 
+  // Handle ![Leftside-N|styles](url) / ![Rightside-N|styles](url) — parity
+  // with vegvisr-frontend processLeftRightImages: the image sits beside the
+  // next N non-empty lines (default 1) in a flex row; Rightside flips order.
+  const processSideImages = (text: string) => {
+    const lines = text.split('\n');
+    const out: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const m = lines[i].trim().match(/^!\[(Rightside|Leftside)(?:-(\d+))?\s*\|\s*([^\]]+?)\s*\]\((.+?)\)(.*)$/);
+      if (!m) {
+        out.push(lines[i]);
+        i++;
+        continue;
+      }
+      const [, type, nStr, styles, url, after] = m;
+      const paragraphCount = parseInt(nStr, 10) || 1;
+      const paras: string[] = [];
+      if (after.trim()) paras.push(after.trim());
+      let j = i + 1;
+      while (paras.length < paragraphCount && j < lines.length) {
+        if (lines[j].trim() !== '') paras.push(lines[j]);
+        j++;
+      }
+      const getStyle = (key: string, fallback: string) => {
+        const found = styles.match(new RegExp(key + `: *['"]?([^;'"]+)['"]?`, 'i'));
+        return found ? found[1].trim() : fallback;
+      };
+      let width = getStyle('width', '20%');
+      if (/^\d+$/.test(width)) width += 'px';
+      let height = getStyle('height', '200px');
+      if (/^\d+$/.test(height)) height += 'px';
+      const objectFit = getStyle('object-fit', 'cover');
+      const objectPosition = getStyle('object-position', 'center');
+
+      let imageFlex = 'flex: 0 0 20%; width: 20%; min-width: 20%;';
+      let contentFlex = 'flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;';
+      if (width.endsWith('px')) {
+        const wv = parseInt(width, 10);
+        if (wv > 200) {
+          const pct = Math.min((wv / 1000) * 100, 60);
+          imageFlex = `flex: 0 0 ${pct}%; width: ${pct}%; min-width: ${pct}%;`;
+          contentFlex = `flex: 1 1 auto; max-width: ${100 - pct - 2}%; min-width: 0; overflow-wrap: break-word;`;
+        }
+      }
+      const imgOrder = type === 'Rightside' ? ' order: 2;' : '';
+      const contentOrder = type === 'Rightside' ? ' order: 1;' : '';
+      out.push(
+        '',
+        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${width}; min-width: ${width}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" /></div><div style="${contentFlex}${contentOrder}">`,
+        '',
+        ...paras,
+        '',
+        '</div></div>',
+        ''
+      );
+      i = j;
+    }
+    return out.join('\n');
+  };
+
   // Simple pre-processor for custom tags
   const processContent = (content: string, commentaries?: any[]) => {
-    let processed = content;
+    let processed = processSideImages(content);
 
     // Handle ![YOUTUBE src=...]title[END YOUTUBE]
     processed = processed.replace(/!\[YOUTUBE src=(.*?)\](.*?)\[END YOUTUBE\]/g, (_, src, title) => {
