@@ -9,6 +9,67 @@ interface NodeRendererProps {
   node: Node;
 }
 
+// Mermaid is loaded on demand (separate chunk) the first time a
+// mermaid-diagram node renders. Same init settings as vegvisr-frontend
+// src/utils/mermaid.js.
+let mermaidPromise: Promise<typeof import('mermaid')['default']> | null = null;
+const getMermaid = () => {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((m) => {
+      m.default.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+        logLevel: 'error',
+      });
+      return m.default;
+    });
+  }
+  return mermaidPromise;
+};
+
+let mermaidIdCounter = 0;
+
+function MermaidDiagram({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRenderError(null);
+    getMermaid()
+      .then((mermaid) => mermaid.render(`mermaid-graph-${++mermaidIdCounter}`, code))
+      .then(({ svg }) => {
+        if (!cancelled && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+        }
+      })
+      .catch((err) => {
+        console.error('Mermaid rendering error:', err);
+        if (!cancelled) setRenderError(err?.message || 'Failed to render diagram');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (renderError) {
+    return (
+      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4">
+        <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-2">Error rendering Mermaid diagram: {renderError}</p>
+        <pre className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap overflow-x-auto">{code}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full overflow-x-auto my-4 flex justify-center items-center [&_svg]:max-w-full [&_svg]:h-auto"
+    />
+  );
+}
+
 export default function NodeRenderer({ node }: NodeRendererProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -223,6 +284,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   }
 
   if (!node.info && node.type !== 'youtube-video') return null;
+
+  if (node.type === 'mermaid-diagram') {
+    return <MermaidDiagram code={node.info} />;
+  }
 
   if (node.type === 'html-node') {
     return (
