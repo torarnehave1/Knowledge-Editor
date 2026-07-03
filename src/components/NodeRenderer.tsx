@@ -310,9 +310,35 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return `\n\n<div class="flex flex-wrap justify-center my-8" style="gap: 20px;">${cardsHtml}</div>\n\n`;
     });
 
-    // Handle remaining FLEXBOX variants (FLEXBOX, -GRID, -GALLERY, -ROW) as a
-    // wrapping flex row; inner markdown (images) still parsed by the renderer.
-    processed = processed.replace(/\[FLEXBOX(?:-(?:GRID|GALLERY|ROW))?(?:\s*\|[^\]]*)?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, body) => {
+    // Handle [FLEXBOX-GRID] ... [END FLEXBOX] — parity with FlexboxGrid.vue:
+    // every ![alt](url) becomes a framed grid item; 3 columns, 2 on tablet,
+    // 1 on mobile.
+    const extractImages = (body: string) =>
+      [...body.matchAll(/!\[([^\]]*?)\]\(([^)]+)\)/g)].map((m) => ({ alt: m[1], src: m[2] }));
+    processed = processed.replace(/\[FLEXBOX-GRID(?:\s*\|[^\]]*)?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, body) => {
+      const images = extractImages(body);
+      if (images.length === 0) return '';
+      const items = images.map((img) =>
+        `<div class="w-full rounded-lg overflow-hidden shadow-md bg-white dark:bg-zinc-900"><img src="${img.src}" alt="${escapeHtml(img.alt)}" class="w-full h-auto block object-cover" style="margin:0;" /></div>`
+      ).join('');
+      return `\n\n<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-[1000px] mx-auto my-8 justify-items-center items-start">${items}</div>\n\n`;
+    });
+
+    // Handle [FLEXBOX-GALLERY] ... [END FLEXBOX] — parity with
+    // FlexboxGallery.vue: fixed-size thumbnails in a wrapping, centered flex
+    // row with hover scale.
+    processed = processed.replace(/\[FLEXBOX-GALLERY(?:\s*\|[^\]]*)?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, body) => {
+      const images = extractImages(body);
+      if (images.length === 0) return '';
+      const items = images.map((img) =>
+        `<div class="flex-none rounded-xl overflow-hidden shadow-md bg-white dark:bg-zinc-900 transition-transform duration-300 hover:scale-105 hover:shadow-xl"><img src="${img.src}" alt="${escapeHtml(img.alt)}" class="w-[250px] h-[200px] object-cover block rounded-xl max-sm:w-[160px] max-sm:h-[130px]" style="margin:0;" /></div>`
+      ).join('');
+      return `\n\n<div class="flex flex-wrap gap-5 justify-center items-start max-w-[1000px] mx-auto my-8">${items}</div>\n\n`;
+    });
+
+    // Handle remaining FLEXBOX variants (plain FLEXBOX, -ROW) as a wrapping
+    // flex row; inner markdown (images) still parsed by the renderer.
+    processed = processed.replace(/\[FLEXBOX(?:-ROW)?(?:\s*\|[^\]]*)?\]([\s\S]*?)\[END\s+FLEXBOX\]/gi, (_, body) => {
       return `\n\n<div class="flex flex-wrap gap-4 justify-center items-center my-6">\n\n${body}\n\n</div>\n\n`;
     });
 
