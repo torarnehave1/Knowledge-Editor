@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -88,6 +88,33 @@ export default function App() {
     checkAuth,
     fetchAvailableModels
   } = useStore();
+
+  // Scroll restoration: remember the scroll position per graph and view mode
+  // (sessionStorage) so a refresh brings the same node back into view.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollSaveTick = useRef(false);
+
+  const handleContentScroll = () => {
+    if (scrollSaveTick.current) return;
+    scrollSaveTick.current = true;
+    requestAnimationFrame(() => {
+      scrollSaveTick.current = false;
+      if (currentGraphId && scrollRef.current) {
+        sessionStorage.setItem(`scroll-${currentGraphId}-${viewMode}`, String(scrollRef.current.scrollTop));
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!currentGraphId || isLoading) return;
+    const saved = sessionStorage.getItem(`scroll-${currentGraphId}-${viewMode}`);
+    if (!saved) return;
+    // Content renders after the doc arrives; give layout a beat before restoring.
+    const timer = setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = parseInt(saved, 10);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [currentGraphId, viewMode, isLoading]);
 
   const getMetaArea = (graph: any): string => {
     const area = graph.metaArea || graph.metadata?.metaArea || '';
@@ -353,7 +380,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className={cn(
+        <div ref={scrollRef} onScroll={handleContentScroll} className={cn(
           "flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950/50 p-8",
           viewMode === 'edit' && "pl-16 md:pl-20" // Add padding to make room for side buttons
         )}>

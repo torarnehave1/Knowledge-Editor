@@ -415,14 +415,19 @@ export const useStore = create<AppState>()(
               localStorage.setItem('emailVerificationToken', tokenData.emailVerificationToken);
               set({ user });
               
-              // Load default graph if exists
-              const defaultId = get().defaultGraphId;
-              if (defaultId) {
-                get().loadGraph(defaultId);
+              // Load the graph from the URL if present, else the default graph
+              const urlGraphId = urlParams.get('graphId');
+              const startId = urlGraphId || get().defaultGraphId;
+              if (startId) {
+                get().loadGraph(startId);
               }
 
-              // Clean URL
-              window.history.replaceState({}, document.title, window.location.pathname);
+              // Clean URL (drop the magic token, keep the graph)
+              window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname + (urlGraphId ? `?graphId=${urlGraphId}` : '')
+              );
             }
           } catch (e) {
             console.error('Auth verification failed:', e);
@@ -440,10 +445,12 @@ export const useStore = create<AppState>()(
                 localStorage.setItem('emailVerificationToken', user.emailVerificationToken);
               }
               
-              // Load default graph if exists
-              const defaultId = get().defaultGraphId;
-              if (defaultId && !get().currentGraphId) {
-                get().loadGraph(defaultId);
+              // Load the graph from the URL if present, else the default graph
+              const urlGraphId = new URLSearchParams(window.location.search).get('graphId');
+              if (urlGraphId && get().currentGraphId !== urlGraphId) {
+                get().loadGraph(urlGraphId);
+              } else if (get().defaultGraphId && !get().currentGraphId) {
+                get().loadGraph(get().defaultGraphId!);
               }
             } catch (e) {
               localStorage.removeItem('user');
@@ -510,6 +517,13 @@ export const useStore = create<AppState>()(
 
       loadGraph: async (id) => {
         set({ isLoading: true, error: null, currentGraphId: id });
+        // Keep the open graph in the URL so a refresh restores it.
+        // The /view path has its own graphId handling — leave it alone.
+        if (window.location.pathname !== '/view') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('graphId', id);
+          window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
         try {
           const data = await knowledgeService.getGraph(id);
           set({ doc: data, viewMode: 'edit' });
