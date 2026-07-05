@@ -1,5 +1,5 @@
 
-import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, UserPlus, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3, Globe } from 'lucide-react';
+import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3, Globe } from 'lucide-react';
 import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
 import { knowledgeService, CONTACT_FORM_TEMPLATE_ID } from '../services/knowledgeService';
@@ -20,7 +20,6 @@ const nodeTypes: { type: NodeType; label: string; icon: any; color: string; temp
   { type: 'info', label: 'Info Box', icon: Info, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
   { type: 'image', label: 'Image', icon: ImageIcon, color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300' },
   { type: 'youtube-video', label: 'YouTube', icon: Youtube, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-  { type: 'REG', label: 'Registration', icon: UserPlus, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
   { type: 'html-node', label: 'HTML Section', icon: Code, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
   { type: 'html-node', label: 'Kontaktskjema', icon: MessageSquare, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300', templateId: CONTACT_FORM_TEMPLATE_ID },
 ];
