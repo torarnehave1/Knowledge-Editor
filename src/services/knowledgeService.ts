@@ -6,6 +6,11 @@ const API_TOKEN = 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8
 
 const getApiToken = () => API_TOKEN;
 
+// Canonical contact-form template row in graphTemplates (vegvisr_org D1).
+// Single source of truth for the "Kontaktskjema" html-node — do not inline the
+// snippet in React; fetch it here so the template stays the one place it lives.
+export const CONTACT_FORM_TEMPLATE_ID = '367f10cd-30f0-491f-9796-e8866782b2a9';
+
 export interface MetaAreaItem {
   name: string;
   count: number;
@@ -18,6 +23,23 @@ export interface SaveResponse {
 }
 
 export const knowledgeService = {
+  // Fetch a graphTemplates row by id and return its parsed nodes.
+  // `nodes` comes back as a JSON string from getTemplates.
+  async getTemplateNodes(templateId: string): Promise<Node[]> {
+    const response = await fetch(`${API_BASE_URL}/getTemplates`, {
+      headers: {
+        'X-API-Token': getApiToken()
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch templates');
+    const data = await response.json();
+    const results: any[] = Array.isArray(data.results) ? data.results : [];
+    const tpl = results.find((t) => t.id === templateId);
+    if (!tpl) throw new Error(`Template ${templateId} not found`);
+    const nodes = typeof tpl.nodes === 'string' ? JSON.parse(tpl.nodes) : tpl.nodes;
+    return (nodes || []) as Node[];
+  },
+
   async listGraphs(metaArea?: string): Promise<GraphListItem[]> {
     let url = `${API_BASE_URL}/getknowgraphs`;
     
