@@ -166,6 +166,7 @@ interface AppState {
   editingNodeId: string | null;
   user: User | null;
   defaultGraphId: string | null;
+  lastGraphId: string | null;
   versionHistory: { version: number; timestamp: string }[];
   
   // Agent State
@@ -285,6 +286,7 @@ export const useStore = create<AppState>()(
       editingNodeId: null,
       user: null,
       defaultGraphId: localStorage.getItem('defaultGraphId'),
+      lastGraphId: localStorage.getItem('lastGraphId'),
       versionHistory: [],
       agents: [],
       agentMessages: [],
@@ -415,18 +417,18 @@ export const useStore = create<AppState>()(
               localStorage.setItem('emailVerificationToken', tokenData.emailVerificationToken);
               set({ user });
               
-              // Load the graph from the URL if present, else the default graph
+              // Load: URL graphId wins, else the last graph worked on, else the pinned default
               const urlGraphId = urlParams.get('graphId');
-              const startId = urlGraphId || get().defaultGraphId;
+              const startId = urlGraphId || get().lastGraphId || get().defaultGraphId;
               if (startId) {
                 get().loadGraph(startId);
               }
 
-              // Clean URL (drop the magic token, keep the graph)
+              // Clean URL (drop the magic token, keep whichever graph we loaded)
               window.history.replaceState(
                 {},
                 document.title,
-                window.location.pathname + (urlGraphId ? `?graphId=${urlGraphId}` : '')
+                window.location.pathname + (startId ? `?graphId=${startId}` : '')
               );
             }
           } catch (e) {
@@ -445,12 +447,13 @@ export const useStore = create<AppState>()(
                 localStorage.setItem('emailVerificationToken', user.emailVerificationToken);
               }
               
-              // Load the graph from the URL if present, else the default graph
+              // Load: URL graphId wins, else the last graph worked on, else the pinned default
               const urlGraphId = new URLSearchParams(window.location.search).get('graphId');
               if (urlGraphId && get().currentGraphId !== urlGraphId) {
                 get().loadGraph(urlGraphId);
-              } else if (get().defaultGraphId && !get().currentGraphId) {
-                get().loadGraph(get().defaultGraphId!);
+              } else if (!get().currentGraphId) {
+                const fallbackId = get().lastGraphId || get().defaultGraphId;
+                if (fallbackId) get().loadGraph(fallbackId);
               }
             } catch (e) {
               localStorage.removeItem('user');
@@ -527,6 +530,10 @@ export const useStore = create<AppState>()(
         try {
           const data = await knowledgeService.getGraph(id);
           set({ doc: data, viewMode: 'edit' });
+          // Remember this as the last graph worked on (survives a fresh login
+          // where the URL carries no graphId). Only persisted on success.
+          localStorage.setItem('lastGraphId', id);
+          set({ lastGraphId: id });
         } catch (e: any) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           
