@@ -467,6 +467,91 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return `\n\n<div class="flex flex-wrap gap-4 justify-center items-center my-6">\n\n${body}\n\n</div>\n\n`;
     });
 
+    // Shared parser (parity with GNewDefaultNode parseQuoteParams): pull
+    // Cited= / cited: out of the params, keep remaining CSS props.
+    const parseQuoteParams = (style: string) => {
+      let cited = 'Unknown';
+      const citedMatch = style.match(/Cited\s*=\s*['"]?([^'";]+)['"]?/i) || style.match(/cited\s*:\s*['"]?([^'";]+)['"]?/i);
+      if (citedMatch) cited = citedMatch[1].trim();
+      const cssProps: string[] = [];
+      const cssRegex = /([\w-]+)\s*:\s*['"]?([^'";]+)['"]?/g;
+      let cm;
+      while ((cm = cssRegex.exec(style)) !== null) {
+        if (cm[1].toLowerCase() !== 'cited') cssProps.push(`${cm[1].toLowerCase()}: ${cm[2].trim()}`);
+      }
+      return { cited, styles: cssProps.join('; ') };
+    };
+
+    // Handle [IMAGEQUOTE ...params...]...[END IMAGEQUOTE] — quote text over a
+    // background image; params parity with parseImageQuoteParams.
+    processed = processed.replace(/\[IMAGEQUOTE\s*([^\]]*)\]([\s\S]*?)\[END\s+IMAGEQUOTE\]/gi, (_, params, content) => {
+      const p: Record<string, string> = {};
+      for (const m of params.matchAll(/(\w+):\s*(?:'([^']*)'|"([^"]*)"|([^\s]+))/g)) {
+        p[m[1]] = m[2] || m[3] || m[4];
+      }
+      const container = [
+        p.backgroundImage ? `background-image: url('${p.backgroundImage}')` : 'background-image: none',
+        `aspect-ratio: ${p.aspectRatio || '16/9'}`,
+        'display: flex', 'align-items: center', 'justify-content: center',
+        'background-size: cover', 'background-position: center',
+        'border-radius: 8px', 'margin: 15px 0', 'position: relative',
+        `width: ${p.width || '100%'}`, `height: ${p.height || 'auto'}`, 'min-height: 200px',
+      ].join('; ');
+      const contentStyle = [
+        'color: white', 'text-shadow: 2px 2px 4px rgba(0,0,0,0.7)',
+        `text-align: ${p.textAlign || 'center'}`, `padding: ${p.padding || '2rem'}`,
+        `font-size: ${p.fontSize || '1.5rem'}`,
+      ].join('; ');
+      const citation = p.cited
+        ? `<div style="position: absolute; bottom: 10px; right: 15px; font-size: 0.9em; opacity: 0.9; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.7);">— ${escapeHtml(p.cited)}</div>`
+        : '';
+      return `\n\n<div style="${container}"><div style="${contentStyle}">${escapeHtml(content.trim())}</div>${citation}</div>\n\n`;
+    });
+
+    // Handle [WNOTE | Cited='...']...[END WNOTE] — work note (parity with
+    // GNewViewer .work-note styling), markdown parsed inside.
+    processed = processed.replace(/\[WNOTE\s*\|([^\]]*)\]([\s\S]*?)\[END\s+WNOTE\]/gi, (_, style, text) => {
+      const { cited, styles } = parseQuoteParams(style);
+      const cite = cited !== 'Unknown'
+        ? `<cite style="display: block; text-align: right; font-style: normal; color: #666; margin-top: 0.5em;">— ${escapeHtml(cited)}</cite>`
+        : '';
+      return `\n\n<div style="background-color: #ffd580; color: #333; font-size: 14px; font-family: 'Courier New', Courier, monospace; font-weight: bold; padding: 10px; margin: 10px 0; border-left: 5px solid #ccc; border-radius: 4px;${styles ? ' ' + styles + ';' : ''}">\n\n${text}\n\n${cite}</div>\n\n`;
+    });
+
+    // Handle [COMMENT | author: '...'; <css>]...[END COMMENT] — author-
+    // attributed comment block (parity with GNewViewer .comment-block).
+    processed = processed.replace(/\[COMMENT\s*\|([^\]]*)\]([\s\S]*?)\[END\s+COMMENT\]/gi, (_, style, text) => {
+      let author = '';
+      let css = '';
+      style.split(';').forEach((s: string) => {
+        const idx = s.indexOf(':');
+        if (idx === -1) return;
+        const k = s.slice(0, idx).trim();
+        const v = s.slice(idx + 1).trim().replace(/^['"]|['"]$/g, '');
+        if (!k || !v) return;
+        if (k.toLowerCase() === 'author') author = v;
+        else css += `${k}: ${v}; `;
+      });
+      const authorHtml = author
+        ? `<div style="font-weight: bold; margin-bottom: 0.5em; color: #888; font-size: 0.93em;">${escapeHtml(author)}</div>`
+        : '';
+      return `\n\n<div style="border-left: 4px solid #ccc; margin: 1.5em 0; padding: 0.75em 1em; font-size: 0.97em; background: #464545; color: #cfcaca; border-radius: 4px; ${css}">${authorHtml}\n\n${text}\n\n</div>\n\n`;
+    });
+
+    // Handle ![Header-N|styles](url) — full-width banner image (parity with
+    // GNewViewer .header-image-container). Does not consume following text.
+    processed = processed.replace(/!\[Header(?:-(\d+))?\|(.+?)\]\((.+?)\)/gi, (_, _n, styles, url) => {
+      const getStyle = (key: string, fallback: string) => {
+        const found = styles.match(new RegExp(key + `: *['"]?([^;'"]+)['"]?`, 'i'));
+        return found ? found[1].trim() : fallback;
+      };
+      let height = getStyle('height', 'auto');
+      if (/^\d+$/.test(height)) height += 'px';
+      const objectFit = getStyle('object-fit', 'cover');
+      const objectPosition = getStyle('object-position', 'center');
+      return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" /></div>\n\n`;
+    });
+
     // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
     processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
       return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">\n\n${text}\n\n</div></div>\n\n`;
