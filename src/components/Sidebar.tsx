@@ -2,7 +2,7 @@
 import { Plus, FileText, StickyNote, Type, Info, Image as ImageIcon, Youtube, Code, Eye, Settings, Sparkles, Bot, MessageSquare, Trash2, Edit3, Globe } from 'lucide-react';
 import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
-import { knowledgeService, CONTACT_FORM_TEMPLATE_ID } from '../services/knowledgeService';
+import { knowledgeService } from '../services/knowledgeService';
 import { useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,9 +11,11 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// `templateId` entries pull their content from a canonical graphTemplates row
-// instead of creating a blank node (single source of truth — see knowledgeService).
-const nodeTypes: { type: NodeType; label: string; icon: any; color: string; templateId?: string }[] = [
+// `templateId` entries pull content from a canonical graphTemplates row.
+// `contactMarker` entries insert a tiny SSOT marker that the contact-form web
+// component (served from the Component Registry graph) mounts live — no blob.
+const CONTACT_ENDPOINT = 'https://brand-worker.torarnehave.workers.dev/__contact';
+const nodeTypes: { type: NodeType; label: string; icon: any; color: string; templateId?: string; contactMarker?: boolean }[] = [
   { type: 'fulltext', label: 'Full Text', icon: FileText, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
   { type: 'notes', label: 'Work Note', icon: StickyNote, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
   { type: 'title', label: 'Title', icon: Type, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
@@ -21,7 +23,7 @@ const nodeTypes: { type: NodeType; label: string; icon: any; color: string; temp
   { type: 'image', label: 'Image', icon: ImageIcon, color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300' },
   { type: 'youtube-video', label: 'YouTube', icon: Youtube, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
   { type: 'html-node', label: 'HTML Section', icon: Code, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  { type: 'html-node', label: 'Kontaktskjema', icon: MessageSquare, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300', templateId: CONTACT_FORM_TEMPLATE_ID },
+  { type: 'html-node', label: 'Kontaktskjema', icon: MessageSquare, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300', contactMarker: true },
 ];
 
 export default function Sidebar() {
@@ -49,6 +51,16 @@ export default function Sidebar() {
   const isPortfolio = viewMode === 'graphs';
 
   const handleAddSection = async (item: typeof nodeTypes[number]) => {
+    if (item.contactMarker) {
+      // SSOT marker — the contact-form component mounts it live (in the editor
+      // iframe and on the published page). graph/node ids are stamped on save.
+      addNode('html-node', {
+        label: 'Kontaktskjema',
+        info: `<div data-vegvisr-contact data-endpoint="${CONTACT_ENDPOINT}"></div>`,
+        color: '#0f2a43',
+      });
+      return;
+    }
     if (!item.templateId) {
       addNode(item.type);
       return;

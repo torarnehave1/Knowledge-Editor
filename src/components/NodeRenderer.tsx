@@ -290,10 +290,19 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   }
 
   if (node.type === 'html-node') {
+    // WYSIWYG: if the html-node is a contact-form marker, inject the SSOT
+    // component script into the iframe (sandbox allows scripts + same-origin)
+    // so the real form mounts in the editor preview — the user sees exactly what
+    // will publish. No-op for html without the marker.
+    const withContactScript = (html: string | null): string => {
+      const h = html || '';
+      if (h.indexOf('data-vegvisr-contact') === -1 || h.indexOf('/components/contact-form.js') !== -1) return h;
+      return h + '<script src="https://api.vegvisr.org/components/contact-form.js" defer></script>';
+    };
     return (
       <div className="w-full h-[800px] rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-inner bg-white">
         <iframe
-          srcDoc={node.info}
+          srcDoc={withContactScript(node.info)}
           title={node.label}
           className="w-full h-full border-none"
           sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin allow-downloads"

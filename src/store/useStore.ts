@@ -17,18 +17,28 @@ const generateUUID = (): string => {
 export type ViewMode = 'edit' | 'preview' | 'json' | 'graphs';
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
-// Stamp the graph + node id onto a contact-form node's `.vgcontact` div so the
-// published form can post them and the relay can resolve a per-node target.
-// Idempotent: strips any prior data-vgc-graph/data-vgc-node before re-adding.
-// No-op for nodes that don't contain the contact snippet.
+// Stamp the graph + node id onto a contact-form node so the published form can
+// post them and the relay resolves a per-node target. Handles BOTH the SSOT
+// marker (`data-vegvisr-contact` → data-graph/data-node) and the legacy inline
+// blob (`.vgcontact` → data-vgc-graph/data-vgc-node). Idempotent. No-op otherwise.
 const injectVgcIds = (info: string | null, graphId: string | null, nodeId: string): string | null => {
-  if (!info || !graphId || !info.includes('vgcontact')) return info;
-  return info.replace(/<div\s+class="vgcontact"([^>]*)>/i, (_m, attrs) => {
-    const cleaned = attrs
-      .replace(/\s*data-vgc-graph="[^"]*"/gi, '')
-      .replace(/\s*data-vgc-node="[^"]*"/gi, '');
-    return `<div class="vgcontact"${cleaned} data-vgc-graph="${graphId}" data-vgc-node="${nodeId}">`;
-  });
+  if (!info || !graphId) return info;
+  let out = info;
+  if (out.indexOf('data-vegvisr-contact') !== -1) {
+    out = out
+      .replace(/\s*data-graph="[^"]*"/gi, '')
+      .replace(/\s*data-node="[^"]*"/gi, '')
+      .replace(/data-vegvisr-contact/i, `data-vegvisr-contact data-graph="${graphId}" data-node="${nodeId}"`);
+  }
+  if (out.indexOf('class="vgcontact"') !== -1) {
+    out = out.replace(/<div\s+class="vgcontact"([^>]*)>/i, (_m, attrs) => {
+      const cleaned = attrs
+        .replace(/\s*data-vgc-graph="[^"]*"/gi, '')
+        .replace(/\s*data-vgc-node="[^"]*"/gi, '');
+      return `<div class="vgcontact"${cleaned} data-vgc-graph="${graphId}" data-vgc-node="${nodeId}">`;
+    });
+  }
+  return out;
 };
 
 const INITIAL_DATA: KnowledgeDocument = {
