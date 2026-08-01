@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useStore } from '../store/useStore';
+import ContactRoutingSection from './ContactRoutingSection';
 import getCaretCoordinates from 'textarea-caret';
 
 function cn(...inputs: ClassValue[]) {
@@ -386,6 +387,10 @@ export default function NodeEditor() {
             />
           </div>
         </div>
+
+        {(editedNode.info || '').includes('vgcontact') && (
+          <ContactRoutingSection nodeId={editedNode.id} />
+        )}
 
         <div className="space-y-2">
           <div className="flex justify-between items-center">

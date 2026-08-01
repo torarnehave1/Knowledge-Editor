@@ -17,6 +17,20 @@ const generateUUID = (): string => {
 export type ViewMode = 'edit' | 'preview' | 'json' | 'graphs';
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
+// Stamp the graph + node id onto a contact-form node's `.vgcontact` div so the
+// published form can post them and the relay can resolve a per-node target.
+// Idempotent: strips any prior data-vgc-graph/data-vgc-node before re-adding.
+// No-op for nodes that don't contain the contact snippet.
+const injectVgcIds = (info: string | null, graphId: string | null, nodeId: string): string | null => {
+  if (!info || !graphId || !info.includes('vgcontact')) return info;
+  return info.replace(/<div\s+class="vgcontact"([^>]*)>/i, (_m, attrs) => {
+    const cleaned = attrs
+      .replace(/\s*data-vgc-graph="[^"]*"/gi, '')
+      .replace(/\s*data-vgc-node="[^"]*"/gi, '');
+    return `<div class="vgcontact"${cleaned} data-vgc-graph="${graphId}" data-vgc-node="${nodeId}">`;
+  });
+};
+
 const INITIAL_DATA: KnowledgeDocument = {
   metadata: {
     title: "Soundarya Lahari - Verse 32",
@@ -1264,10 +1278,14 @@ export const useStore = create<AppState>()(
       },
 
       saveNode: (updatedNode) => {
+        const stampedNode = {
+          ...updatedNode,
+          info: injectVgcIds(updatedNode.info, get().currentGraphId, updatedNode.id)
+        };
         set((state) => ({
           doc: {
             ...state.doc,
-            nodes: state.doc.nodes.map(n => n.id === updatedNode.id ? updatedNode : n)
+            nodes: state.doc.nodes.map(n => n.id === stampedNode.id ? stampedNode : n)
           },
           editingNodeId: null
         }));
