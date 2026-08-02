@@ -56,7 +56,10 @@ export default function Sidebar() {
       // iframe and on the published page). graph/node ids are stamped on save.
       addNode('html-node', {
         label: 'Kontaktskjema',
-        info: `<div data-vegvisr-contact data-endpoint="${CONTACT_ENDPOINT}"></div>`,
+        // Self-contained marker: carries its own <script> so it mounts anywhere
+        // it renders in an iframe/page (editor, gnew-viewer, published) without
+        // depending on host-side injection. graph/node ids stamped on save.
+        info: `<div data-vegvisr-contact data-endpoint="${CONTACT_ENDPOINT}"></div><script src="https://api.vegvisr.org/components/contact-form.js" defer></script>`,
         color: '#0f2a43',
       });
       return;
