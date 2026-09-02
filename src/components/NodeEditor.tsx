@@ -1,12 +1,14 @@
 
 import { Node, NodeType, Commentary } from '../types';
-import { X, Save, Trash2, Wand2, Globe, ShieldAlert, Eye, MessageSquare, Youtube, Quote, Layout, Sparkles, MessageCircle } from 'lucide-react';
+import { X, Save, Trash2, Wand2, Globe, ShieldAlert, Eye, MessageSquare, Youtube, Quote, Layout, Sparkles, MessageCircle, Film } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useStore } from '../store/useStore';
 import ContactRoutingSection from './ContactRoutingSection';
+import RealtimeVideoPicker from './RealtimeVideoPicker';
+import { buildRealtimeVideoInfo, recordingLabel, resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 import getCaretCoordinates from 'textarea-caret';
 
 function cn(...inputs: ClassValue[]) {
@@ -103,6 +105,7 @@ export default function NodeEditor() {
   const [commentaryText, setCommentaryText] = useState('');
   const [selectionRange, setSelectionRange] = useState<{ start: number, end: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isVideoPickerOpen, setIsVideoPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Suggestion Menu State
@@ -255,6 +258,8 @@ export default function NodeEditor() {
     setSelectionRange(null);
   };
 
+  const isRealtimeVideo = editedNode.type === 'realtime-video';
+
   const isHtmlNode = editedNode.type === 'html-node';
 
   return (
@@ -305,6 +310,7 @@ export default function NodeEditor() {
               <option value="image">Image</option>
               <option value="youtube-video">YouTube Video</option>
               <option value="audio">Audio</option>
+              <option value="realtime-video">Realtime Video</option>
               <option value="audio-visualizer">Audio Visualizer</option>
               <option value="REG">Registration</option>
               <option value="html-node">HTML Section</option>
@@ -352,6 +358,56 @@ export default function NodeEditor() {
               className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
             <p className="text-[10px] text-zinc-500">Paste the full audio file URL here (mp3, wav, etc.)</p>
+          </div>
+        )}
+
+        {isRealtimeVideo && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Realtime Video Path</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                name="path"
+                value={editedNode.path || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditedNode(prev => prev ? ({ ...prev, path: val, publicUrl: null }) : null);
+                }}
+                placeholder="recordings/My_Session.mp4"
+                className="flex-1 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setIsVideoPickerOpen(true)}
+                className="flex items-center gap-2 px-3 rounded-lg bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+              >
+                <Film size={14} />
+                Browse
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              R2 key in the realtimevideos bucket (or a full MP4 URL).
+              {editedNode.path ? ` → ${resolveRealtimeVideoUrl(editedNode.path, editedNode.publicUrl)}` : ''}
+            </p>
+            <RealtimeVideoPicker
+              open={isVideoPickerOpen}
+              onClose={() => setIsVideoPickerOpen(false)}
+              onSelect={(rec) => {
+                setIsVideoPickerOpen(false);
+                setEditedNode(prev => prev ? ({
+                  ...prev,
+                  path: rec.path,
+                  publicUrl: rec.url || null,
+                  bibl: rec.url ? [rec.url] : prev.bibl,
+                  label: (!prev.label || prev.label === 'Realtime Video' || /^New realtime-video Section$/i.test(prev.label))
+                    ? recordingLabel(rec)
+                    : prev.label,
+                  info: (!prev.info || prev.info.includes('realtimevideos bucket'))
+                    ? buildRealtimeVideoInfo(rec)
+                    : prev.info,
+                }) : null);
+              }}
+            />
           </div>
         )}
 

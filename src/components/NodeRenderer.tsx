@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Node } from '../types';
-import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity } from 'lucide-react';
+import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film } from 'lucide-react';
+import { resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 
 interface NodeRendererProps {
   node: Node;
@@ -281,6 +282,40 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         </div>
       );
     }
+  }
+
+  if (node.type === 'realtime-video') {
+    const videoUrl = resolveRealtimeVideoUrl(node.path, node.publicUrl);
+
+    return (
+      <div className="space-y-4">
+        {videoUrl ? (
+          <div className="w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
+            <video
+              src={videoUrl}
+              title={node.label}
+              className="block w-full max-h-[70vh] bg-black"
+              controls
+              preload="metadata"
+              playsInline
+            />
+          </div>
+        ) : (
+          <div className="w-full py-12 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center text-zinc-400 gap-2">
+            <Film size={24} className="opacity-50" />
+            <p className="text-sm font-medium">No realtime video selected</p>
+            <p className="text-xs">Edit this section and pick a recording, or paste an MP4 URL.</p>
+          </div>
+        )}
+        {node.info && (
+          <div className="prose prose-slate max-w-none dark:prose-invert">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+              {node.info}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (!node.info && node.type !== 'youtube-video') return null;

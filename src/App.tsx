@@ -10,6 +10,9 @@ import { ScreenRecorder } from 'vegvisr-ui-kit';
 import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
+
+// Media nodes render from `path`, not `info` — no "add content" placeholder.
+const MEDIA_NODE_TYPES = ['realtime-video', 'youtube-video', 'audio', 'audio-visualizer'];
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
@@ -743,7 +746,7 @@ export default function App() {
 
                       <div className="relative">
                         <NodeRenderer node={node} />
-                        {viewMode === 'edit' && !node.info && (
+                        {viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && (
                           <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400">
                             <Plus size={24} className="mb-2 opacity-50" />
                             <p className="text-sm font-medium">Click edit to add content</p>

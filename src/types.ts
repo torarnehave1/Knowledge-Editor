@@ -27,6 +27,7 @@ export interface Node {
   imageHeight: string;
   visible: boolean;
   path: string | null;
+  publicUrl?: string | null;
   commentaries?: Commentary[];
 }
 
