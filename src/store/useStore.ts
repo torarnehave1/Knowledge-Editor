@@ -849,18 +849,16 @@ export const useStore = create<AppState>()(
         const systemPrompt = "You are an SEO expert. Your goal is to write high-converting meta descriptions that improve CTR and search rankings. Be concise, use active voice, and include relevant keywords.";
 
         try {
-          // Use grok provider and grok-3 model as requested
+          // Claude Haiku 4.5 for this: a 160-character description does not need a
+          // reasoning model. api.vegvisr.org/worker-ai/chat routes provider 'anthropic'
+          // to anthropic-worker; anything else lands on Gemma, which spends 10-40s
+          // reasoning and answers Norwegian prompts in Swedish.
           let result: string;
           try {
-            result = await askGemini(prompt, null, 'grok', 'grok-3', systemPrompt);
+            result = await askGemini(prompt, null, 'anthropic', 'claude-haiku-4-5-20251001', systemPrompt);
           } catch (aiError) {
-            console.warn('Grok-3 failed, falling back to Grok-2:', aiError);
-            try {
-              result = await askGemini(prompt, null, 'grok', 'grok-2', systemPrompt);
-            } catch (aiError2) {
-              console.warn('Grok-2 failed, falling back to Gemini:', aiError2);
-              result = await askGemini(prompt, null, 'gemini', 'gemini-2.5-flash', systemPrompt);
-            }
+            console.warn('Haiku failed, falling back to Gemma:', aiError);
+            result = await askGemini(prompt, null, 'gemma', undefined, systemPrompt);
           }
           
           const cleanDesc = result.trim().replace(/^["']|["']$/g, '');
@@ -915,9 +913,10 @@ export const useStore = create<AppState>()(
         try {
           let result: string;
           try {
-            result = await askGemini(prompt, null, 'grok', 'grok-3', systemPrompt);
+            result = await askGemini(prompt, null, 'anthropic', 'claude-haiku-4-5-20251001', systemPrompt);
           } catch (aiError) {
-            result = await askGemini(prompt, null, 'gemini', 'gemini-2.5-flash', systemPrompt);
+            console.warn('Haiku failed, falling back to Gemma:', aiError);
+            result = await askGemini(prompt, null, 'gemma', undefined, systemPrompt);
           }
           
           const cleanKeywords = result.trim().replace(/^["']|["']$/g, '');
