@@ -75,6 +75,24 @@ export const imageUrlFromDataTransfer = (dt: DataTransfer | null): string | null
   return null;
 };
 
+// Pull a pasted image out of the clipboard: by MIME type first, then by file
+// extension for sources that hand over a File with no usable type.
+export const imageFileFromClipboard = (clipboardData: DataTransfer | null): File | null => {
+  if (!clipboardData) return null;
+
+  for (const item of Array.from(clipboardData.items || [])) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+
+  const files = clipboardData.files;
+  if (files && files.length > 0 && isImageFile(files[0])) return files[0];
+
+  return null;
+};
+
 export const uploadImage = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file, filenameFor(file));

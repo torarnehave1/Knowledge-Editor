@@ -10,7 +10,7 @@ import ContactRoutingSection from './ContactRoutingSection';
 import RealtimeVideoPicker from './RealtimeVideoPicker';
 import { buildRealtimeVideoInfo, recordingLabel, resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 import getCaretCoordinates from 'textarea-caret';
-import { uploadImage, isImageFile, looksLikeImageUrl, imageUrlFromDataTransfer, buildImageSnippet, altTextFor } from '../services/imageUpload';
+import { uploadImage, isImageFile, looksLikeImageUrl, imageUrlFromDataTransfer, imageFileFromClipboard, buildImageSnippet, altTextFor } from '../services/imageUpload';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -118,6 +118,16 @@ export default function NodeEditor() {
   // controlled-textarea value write when the insert follows an async upload —
   // the browser then parks the caret at the end. An effect runs after the commit.
   const [pendingCaret, setPendingCaret] = useState<number | null>(null);
+
+  // An image paste is handled for the whole editor, not just the textarea, so it
+  // also works when the caret sits in the Image section's drop zone or nowhere.
+  // The ref keeps the listener on the current render's handler.
+  const pasteHandlerRef = useRef<((e: ClipboardEvent) => void) | null>(null);
+  useEffect(() => {
+    const listener = (e: ClipboardEvent) => pasteHandlerRef.current?.(e);
+    document.addEventListener('paste', listener);
+    return () => document.removeEventListener('paste', listener);
+  }, []);
 
   useEffect(() => {
     if (pendingCaret === null) return;
@@ -283,6 +293,10 @@ export default function NodeEditor() {
 
   const isHtmlNode = editedNode.type === 'html-node';
 
+  // An Image section is a normal content node whose content is image markdown —
+  // ![alt|width: 300px](url). It gets a drop zone instead of a bare textarea.
+  const isImageSection = editedNode.type === 'image';
+
   // ---------------------------------------------------------------------------
   // Image paste + drag-drop → R2 upload → markdown insert at the cursor.
   // Ported from vegvisr-frontend GNewViewer.vue (handleNodeContentPaste /
@@ -324,27 +338,25 @@ export default function NodeEditor() {
     }
   };
 
-  const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (items) {
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            e.preventDefault();
-            await uploadAndInsertImage(file);
-            return;
-          }
-        }
-      }
-    }
+  const handleDocumentPaste = async (e: ClipboardEvent) => {
+    // Editor closed, or rendering null — nothing to insert into.
+    if (!textareaRef.current) return;
 
-    const files = e.clipboardData?.files;
-    if (files && files.length > 0 && isImageFile(files[0])) {
-      e.preventDefault();
-      await uploadAndInsertImage(files[0]);
-    }
+    // Leave pastes into the other fields (label, color, AI prompt, commentary) alone.
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLInputElement ||
+      (active instanceof HTMLTextAreaElement && active !== textareaRef.current)
+    ) return;
+
+    const file = imageFileFromClipboard(e.clipboardData);
+    if (!file) return;
+
+    e.preventDefault();
+    await uploadAndInsertImage(file);
   };
+
+  pasteHandlerRef.current = handleDocumentPaste;
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -391,6 +403,25 @@ export default function NodeEditor() {
     }
     insertImageUrl(url);
   };
+
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!isImageFile(file)) {
+      flashUploadError('Only image files are supported.');
+      return;
+    }
+    await uploadAndInsertImage(file);
+  };
+
+  // First image already in the content, for the drop zone's preview thumbnail.
+  const currentImageUrl = (() => {
+    const info = editedNode.info || '';
+    return info.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1]
+      || info.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
+      || null;
+  })();
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden flex flex-col h-full">
@@ -578,6 +609,51 @@ export default function NodeEditor() {
           <ContactRoutingSection nodeId={editedNode.id} />
         )}
 
+        {isImageSection && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Image</label>
+            <label
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors text-center",
+                isDragOver
+                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
+                  : "border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 hover:bg-zinc-50 dark:hover:bg-zinc-950"
+              )}
+            >
+              <input type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
+
+              {currentImageUrl && !isUploadingImage && (
+                <img
+                  src={currentImageUrl}
+                  alt="Current section image"
+                  className="max-h-40 rounded-lg shadow-sm object-contain"
+                />
+              )}
+
+              {isUploadingImage ? (
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-300">
+                  <div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Uploading image</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-zinc-500">
+                  <ImagePlus size={24} className={isDragOver ? "text-indigo-600 dark:text-indigo-300" : ""} />
+                  <span className="text-xs font-semibold">
+                    {currentImageUrl ? 'Drop, paste or click to replace the image' : 'Drop an image here, paste it, or click to choose a file'}
+                  </span>
+                  <span className="text-[10px]">
+                    Inserted into the content below as ![alt|width: 300px](url)
+                  </span>
+                </div>
+              )}
+            </label>
+          </div>
+        )}
+
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
@@ -617,7 +693,6 @@ export default function NodeEditor() {
               value={editedNode.info || ''}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              onPaste={handleContentPaste}
               rows={isHtmlNode ? 20 : 12}
               disabled={isGenerating}
               className={cn(
