@@ -1,6 +1,6 @@
 
 import { Node, NodeType, Commentary } from '../types';
-import { X, Save, Trash2, Wand2, Globe, ShieldAlert, Eye, MessageSquare, Youtube, Quote, Layout, Sparkles, MessageCircle, Film } from 'lucide-react';
+import { X, Save, Trash2, Wand2, Globe, ShieldAlert, Eye, MessageSquare, Youtube, Quote, Layout, Sparkles, MessageCircle, Film, ImagePlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { clsx, type ClassValue } from 'clsx';
@@ -10,6 +10,7 @@ import ContactRoutingSection from './ContactRoutingSection';
 import RealtimeVideoPicker from './RealtimeVideoPicker';
 import { buildRealtimeVideoInfo, recordingLabel, resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 import getCaretCoordinates from 'textarea-caret';
+import { uploadImage, isImageFile, looksLikeImageUrl, imageUrlFromDataTransfer, buildImageSnippet, altTextFor } from '../services/imageUpload';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -107,6 +108,26 @@ export default function NodeEditor() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [isVideoPickerOpen, setIsVideoPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Image paste / drag-drop state (parity with the legacy GNewViewer edit modal)
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const dragCounter = useRef(0);
+  // Caret position to restore after an insert. A setTimeout(0) restore races the
+  // controlled-textarea value write when the insert follows an async upload —
+  // the browser then parks the caret at the end. An effect runs after the commit.
+  const [pendingCaret, setPendingCaret] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pendingCaret === null) return;
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(pendingCaret, pendingCaret);
+    }
+    setPendingCaret(null);
+  }, [pendingCaret]);
 
   // Suggestion Menu State
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -261,6 +282,115 @@ export default function NodeEditor() {
   const isRealtimeVideo = editedNode.type === 'realtime-video';
 
   const isHtmlNode = editedNode.type === 'html-node';
+
+  // ---------------------------------------------------------------------------
+  // Image paste + drag-drop → R2 upload → markdown insert at the cursor.
+  // Ported from vegvisr-frontend GNewViewer.vue (handleNodeContentPaste /
+  // handleDrop / uploadAndInsertImage) so the new editor behaves identically.
+  // ---------------------------------------------------------------------------
+
+  const flashUploadError = (message: string) => {
+    setUploadError(message);
+    setTimeout(() => setUploadError(null), 5000);
+  };
+
+  const insertAtCursor = (text: string) => {
+    const textarea = textareaRef.current;
+    const current = editedNode.info || '';
+    const start = textarea ? textarea.selectionStart : current.length;
+    const end = textarea ? textarea.selectionEnd : current.length;
+    const newInfo = current.substring(0, start) + text + current.substring(end);
+
+    setEditedNode(prev => prev ? ({ ...prev, info: newInfo }) : null);
+    setShowSuggestions(false);
+    setPendingCaret(start + text.length);
+  };
+
+  const insertImageUrl = (url: string) => {
+    const filename = url.split('/').pop()?.split('?')[0] || 'image';
+    insertAtCursor(buildImageSnippet(url, altTextFor(filename), isHtmlNode));
+  };
+
+  const uploadAndInsertImage = async (file: File) => {
+    try {
+      setUploadError(null);
+      setIsUploadingImage(true);
+      const url = await uploadImage(file);
+      insertAtCursor(buildImageSnippet(url, altTextFor(file.name || 'image'), isHtmlNode));
+    } catch (err: any) {
+      flashUploadError(err?.message || 'Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            await uploadAndInsertImage(file);
+            return;
+          }
+        }
+      }
+    }
+
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0 && isImageFile(files[0])) {
+      e.preventDefault();
+      await uploadAndInsertImage(files[0]);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragOver(false);
+
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (!isImageFile(file)) {
+        flashUploadError('Only image files are supported.');
+        return;
+      }
+      await uploadAndInsertImage(file);
+      return;
+    }
+
+    // No file: the Photos app (and browsers dragging an <img>) hand over a URL.
+    const url = imageUrlFromDataTransfer(e.dataTransfer);
+    if (!url) {
+      flashUploadError('Nothing to insert — drop an image file or an image URL.');
+      return;
+    }
+    if (!looksLikeImageUrl(url)) {
+      flashUploadError('URL does not appear to be an image.');
+      return;
+    }
+    insertImageUrl(url);
+  };
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden flex flex-col h-full">
@@ -474,13 +604,20 @@ export default function NodeEditor() {
               )}
             </div>
           </div>
-          <div className="relative">
+          <div
+            className="relative"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <textarea
               ref={textareaRef}
               name="info"
               value={editedNode.info || ''}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onPaste={handleContentPaste}
               rows={isHtmlNode ? 20 : 12}
               disabled={isGenerating}
               className={cn(
@@ -500,6 +637,31 @@ export default function NodeEditor() {
                   <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest">AI is generating...</span>
                 </div>
               </div>
+            )}
+
+            {isDragOver && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-indigo-500 bg-indigo-50/90 dark:bg-indigo-950/80 backdrop-blur-[1px] pointer-events-none">
+                <div className="flex flex-col items-center gap-2 text-indigo-600 dark:text-indigo-300">
+                  <ImagePlus size={28} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Drop image to insert</span>
+                </div>
+              </div>
+            )}
+
+            {isUploadingImage && (
+              <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700">
+                <div className="w-3 h-3 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-300">Uploading image</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] text-zinc-500">
+              Paste an image (Cmd+V) or drag one in — it uploads to R2 and is inserted at the cursor.
+            </p>
+            {uploadError && (
+              <p className="text-[10px] font-semibold text-red-600 dark:text-red-400 text-right">{uploadError}</p>
             )}
           </div>
 
