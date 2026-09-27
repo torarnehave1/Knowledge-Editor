@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star } from 'lucide-react';
+import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -13,6 +13,7 @@ import NodeRenderer from './components/NodeRenderer';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
 const MEDIA_NODE_TYPES = ['realtime-video', 'youtube-video', 'audio', 'audio-visualizer'];
+
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
@@ -22,6 +23,11 @@ import { AgentChat } from './components/AgentChat';
 import { Login } from './components/Login';
 import { useStore } from './store/useStore';
 import { LogOut } from 'lucide-react';
+
+// An Image section carries its picture as markdown in `info`, so "has an image"
+// means the content references one — an empty one is a blank card otherwise.
+const hasImageContent = (info?: string | null) =>
+  !!info && (/!\[[^\]]*\]\([^)]+\)/.test(info) || /<img[^>]+src=["'][^"']+["']/i.test(info));
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -746,11 +752,19 @@ export default function App() {
 
                       <div className="relative">
                         <NodeRenderer node={node} />
-                        {viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && (
-                          <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400">
-                            <Plus size={24} className="mb-2 opacity-50" />
-                            <p className="text-sm font-medium">Click edit to add content</p>
+                        {node.type === 'image' && !hasImageContent(node.info) ? (
+                          <div className="py-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400 gap-1">
+                            <ImageOff size={24} className="mb-1 opacity-50" />
+                            <p className="text-sm font-medium">Image section — no image yet</p>
+                            <p className="text-xs">Open this section and drop, paste or choose an image.</p>
                           </div>
+                        ) : (
+                          viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && (
+                            <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400">
+                              <Plus size={24} className="mb-2 opacity-50" />
+                              <p className="text-sm font-medium">Click edit to add content</p>
+                            </div>
+                          )
                         )}
                       </div>
                     </div>
