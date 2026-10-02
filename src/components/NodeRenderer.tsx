@@ -596,9 +596,18 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" /></div>\n\n`;
     });
 
-    // Handle [SECTION | background-color:'...'; color:'...']...[END SECTION]
-    processed = processed.replace(/\[SECTION\s*\|\s*background-color\s*:\s*['"]?(.*?)['"]?\s*;\s*color\s*:\s*['"]?(.*?)['"]?\s*\]([\s\S]*?)\[END SECTION\]/gi, (_, bgColor, color, text) => {
-      return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="background-color: ${bgColor.trim()}; color: ${color.trim()};"><div class="break-words">\n\n${text}\n\n</div></div>\n\n`;
+    // Handle [SECTION | background-color:'...'; color:'...'; text-align:'...'; ...]...[END SECTION]
+    processed = processed.replace(/\[SECTION\s*\|([^\]]*)\]([\s\S]*?)\[END SECTION\]/gi, (_, styles, text) => {
+      let css = '';
+      styles.split(';').forEach((s: string) => {
+        const idx = s.indexOf(':');
+        if (idx === -1) return;
+        const k = s.slice(0, idx).trim();
+        const v = s.slice(idx + 1).trim().replace(/^['"]|['"]$/g, '');
+        if (!k || !v) return;
+        css += `${k}: ${v}; `;
+      });
+      return `\n\n<div class="p-10 my-8 rounded-3xl shadow-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50" style="${css}"><div class="break-words">\n\n${text}\n\n</div></div>\n\n`;
     });
 
     // Handle [FANCY | font-size:...; color:...; background-image:url('...')]...[END FANCY]
