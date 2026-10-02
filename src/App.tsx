@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff } from 'lucide-react';
+import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -82,6 +82,7 @@ export default function App() {
     fetchTrash,
     loadGraph,
     saveGraph,
+    togglePublicationState,
     createNewGraph,
     deleteGraph,
     restoreGraph,
@@ -289,9 +290,9 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {user && (
-              <div className="flex items-center gap-3 mr-2 pr-4 border-r border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 mr-1 pr-3 border-r border-zinc-200 dark:border-zinc-800">
                 <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium hidden sm:inline">
                   {user.email}
                 </span>
@@ -305,86 +306,102 @@ export default function App() {
               </div>
             )}
             {viewMode === 'graphs' && currentGraphId && (
-              <button 
+              <button
                 onClick={() => setViewMode('edit')}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800/50"
+                className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800/50"
+                title="Active Graph — return to editor"
               >
                 <Activity size={18} />
-                ACTIVE GRAPH
               </button>
             )}
             {viewMode === 'edit' && currentGraphId && (
-              <button 
+              <button
                 onClick={() => setIsVersionHistoryModalOpen(true)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                  isVersionHistoryModalOpen 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                  "p-2 rounded-lg transition-all",
+                  isVersionHistoryModalOpen
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
                 )}
+                title="History"
               >
                 <History size={18} />
-                History
               </button>
             )}
             {viewMode === 'edit' && (
-              <button 
+              <button
                 onClick={() => setIsReorderModalOpen(true)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                  isReorderModalOpen 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                  "p-2 rounded-lg transition-all",
+                  isReorderModalOpen
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
                 )}
+                title="Reorder Nodes"
               >
                 <RotateCcw size={18} className="rotate-180" />
-                Reorder Nodes
               </button>
             )}
             {viewMode === 'edit' && currentGraphId && (
-              <button 
+              <button
                 onClick={() => setIsSEOModalOpen(true)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                  isSEOModalOpen 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                  "p-2 rounded-lg transition-all",
+                  isSEOModalOpen
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
                 )}
+                title="SEO Page"
               >
                 <Globe size={18} />
-                SEO Page
               </button>
             )}
-            <button 
+            {viewMode === 'edit' && currentGraphId && user?.role === 'Superadmin' && (
+              <button
+                onClick={() => togglePublicationState()}
+                className={cn(
+                  "p-2 rounded-lg transition-all",
+                  doc.metadata?.publicationState === 'published'
+                    ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                    : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                )}
+                title={doc.metadata?.publicationState === 'published' ? 'Published — click to unpublish' : 'Publish — make visible to all users'}
+              >
+                {doc.metadata?.publicationState === 'published' ? <CheckCircle2 size={18} /> : <Rocket size={18} />}
+              </button>
+            )}
+            <button
               onClick={() => setViewMode('graphs')}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                viewMode === 'graphs' 
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                "p-2 rounded-lg transition-all",
+                viewMode === 'graphs'
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
                   : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
               )}
+              title="My Graphs"
             >
               <Database size={18} />
-              My Graphs
             </button>
-            <button 
+            <button
               onClick={() => saveGraph()}
               disabled={saveStatus === 'saving'}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg active:scale-95",
-                saveStatus === 'success' ? "bg-emerald-500 text-white" : 
+                "p-2.5 rounded-lg transition-all shadow-lg active:scale-95",
+                saveStatus === 'success' ? "bg-emerald-500 text-white" :
                 saveStatus === 'error' ? "bg-red-500 text-white" :
                 "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200"
               )}
+              title={
+                saveStatus === 'saving' ? 'Saving...' :
+                saveStatus === 'success' ? 'Saved' :
+                saveStatus === 'error' ? 'Error saving' :
+                !currentGraphId ? 'Save as New Graph' : 'Save Document'
+              }
             >
-              {saveStatus === 'saving' ? <Loader2 size={18} className="animate-spin" /> : 
-               saveStatus === 'success' ? <Check size={18} /> : 
-               saveStatus === 'error' ? <AlertCircle size={18} /> : 
+              {saveStatus === 'saving' ? <Loader2 size={18} className="animate-spin" /> :
+               saveStatus === 'success' ? <Check size={18} /> :
+               saveStatus === 'error' ? <AlertCircle size={18} /> :
                <Save size={18} />}
-              {saveStatus === 'saving' ? 'Saving...' : 
-               saveStatus === 'success' ? 'Saved' : 
-               saveStatus === 'error' ? 'Error' : 
-               !currentGraphId ? 'Save as New Graph' : 'Save Document'}
             </button>
           </div>
         </header>

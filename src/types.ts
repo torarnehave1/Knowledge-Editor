@@ -42,6 +42,7 @@ export interface GraphMetadata {
   seoOgImage?: string;
   seoKeywords?: string;
   publicationState?: 'draft' | 'published';
+  publishedAt?: string | null;
 }
 
 export interface GraphListItem {

@@ -255,6 +255,7 @@ interface AppState {
   generateSEODescription: (title: string) => Promise<string>;
   generateSEOKeywords: (title: string) => Promise<string>;
   publishSEOPage: (seoData: { slug: string; title: string; description: string; ogImage: string; keywords: string }) => Promise<void>;
+  togglePublicationState: () => Promise<void>;
   fetchAvailableModels: () => Promise<void>;
   fetchEndpoints: () => Promise<void>;
   
@@ -969,6 +970,34 @@ export const useStore = create<AppState>()(
         }
       },
 
+      togglePublicationState: async () => {
+        const { currentGraphId, doc, user } = get();
+        if (!currentGraphId || !doc.metadata) return;
+        if (user?.role !== 'Superadmin') {
+          set({ error: 'Only Superadmin can change publication state' });
+          return;
+        }
+
+        const newState = doc.metadata.publicationState === 'published' ? 'draft' : 'published';
+        const confirmMessage = newState === 'published'
+          ? `Publish "${doc.metadata.title || 'Untitled Graph'}"?\n\nThis will make it visible to all users.`
+          : `Unpublish "${doc.metadata.title || 'Untitled Graph'}"?\n\nThis will make it only visible to Superadmin.`;
+        if (!window.confirm(confirmMessage)) return;
+
+        set((state) => ({
+          doc: {
+            ...state.doc,
+            metadata: {
+              ...state.doc.metadata,
+              publicationState: newState,
+              publishedAt: newState === 'published' ? new Date().toISOString() : null
+            }
+          }
+        }));
+
+        await get().saveGraph();
+      },
+
       fetchAvailableModels: async () => {
         try {
           const userToken = localStorage.getItem('emailVerificationToken');
@@ -994,27 +1023,20 @@ export const useStore = create<AppState>()(
           }
         } catch (e) {
           console.error('Failed to fetch models:', e);
-          // Fallback to some defaults if API fails
+          // Fallback only — /worker-ai/models above is the source of truth. Keep this
+          // list to providers that endpoint actually serves: it previously offered
+          // openai, gemini and grok, none of which the backend has ever routed, so a
+          // failed fetch handed the picker three menus of models that silently ran on
+          // Gemma instead.
           set({
             availableModels: {
-              gemini: [
-                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' }
-              ],
-              openai: [
-                { id: 'gpt-4o', name: 'GPT-4o' },
-                { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-                { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' }
-              ],
               anthropic: [
-                { id: 'claude-opus-4-8', name: 'Claude Opus 4.8' },
+                { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
                 { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
-                { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' }
+                { id: 'claude-opus-4-8', name: 'Claude Opus 4.8' }
               ],
-              grok: [
-                { id: 'grok-3', name: 'Grok-3' },
-                { id: 'grok-2', name: 'Grok-2' }
+              gemma: [
+                { id: '@cf/google/gemma-4-26b-a4b-it', name: 'Gemma 4 26B' }
               ]
             }
           });
