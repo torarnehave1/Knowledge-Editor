@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, ChevronUp, ChevronDown, Eye, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
+import { Edit2, Trash2, MoreHorizontal, ChevronUp, ChevronDown, Eye, EyeOff, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -8,6 +8,7 @@ import { Node, NodeType, User } from './types';
 import { VALID_NODE_TYPES } from './constants';
 import { ScreenRecorder } from 'vegvisr-ui-kit';
 import Sidebar from './components/Sidebar';
+import { MobileHeader, MobileBottomNav, Sheet, SheetAction } from './components/MobileChrome';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
 
@@ -189,6 +190,11 @@ export default function App() {
 
   const editingNode = doc.nodes.find(n => n.id === editingNodeId);
 
+  // Mobile: move/delete live in a per-section action sheet (no hover on touch).
+  const [nodeMenuId, setNodeMenuId] = useState<string | null>(null);
+  const nodeMenuIndex = doc.nodes.findIndex(n => n.id === nodeMenuId);
+  const nodeMenuNode = nodeMenuIndex >= 0 ? doc.nodes[nodeMenuIndex] : null;
+
   if (isViewMode) {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-y-auto p-8">
@@ -235,15 +241,16 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
-      <div className="flex-shrink-0 flex items-center justify-end border-b border-slate-800 bg-slate-900 px-4 py-2 text-slate-100 z-50">
+    <div className="flex flex-col h-dvh max-md:font-ui bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
+      <div className="flex-shrink-0 hidden md:flex items-center justify-end border-b border-slate-800 bg-slate-900 px-4 py-2 text-slate-100 z-50">
         <ScreenRecorder />
       </div>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
 
-        <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-8 bg-white dark:bg-zinc-950 z-10">
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <MobileHeader />
+        <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 hidden md:flex items-center justify-between px-8 bg-white dark:bg-zinc-950 z-10">
           <div className="flex items-center gap-4">
             <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
               <button
@@ -407,15 +414,15 @@ export default function App() {
         </header>
 
         <div ref={scrollRef} onScroll={handleContentScroll} className={cn(
-          "flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950/50 p-8",
-          viewMode === 'edit' && "pl-16 md:pl-20" // Add padding to make room for side buttons
+          "flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950/50 p-4 md:p-8",
+          viewMode === 'edit' && "md:pl-20" // Add padding to make room for side buttons
         )}>
-          <div className="max-w-6xl mx-auto space-y-8">
+          <div className="max-w-6xl mx-auto space-y-4 md:space-y-8">
             {viewMode === 'graphs' ? (
-              <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl border border-zinc-200 dark:border-zinc-800">
-                <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 mb-8">
+              <div className="bg-white dark:bg-zinc-900 rounded-2xl md:rounded-3xl p-4 md:p-8 md:shadow-2xl border border-zinc-200 dark:border-zinc-800">
+                <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 md:gap-6 mb-6 md:mb-8">
                   <div className="flex flex-wrap items-center gap-6">
-                    <div className="flex items-center gap-3">
+                    <div className="hidden md:flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
                         <List size={24} />
                       </div>
@@ -446,14 +453,14 @@ export default function App() {
                   <div className="flex flex-wrap items-center gap-4">
                     {!isTrashView && (
                       <>
-                        <div className="relative">
+                        <div className="relative w-full sm:w-auto">
                           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                           <input 
                             type="text"
                             placeholder="Search graphs..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold py-1.5 pl-9 pr-3 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 outline-none w-32 sm:w-48"
+                            className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold py-1.5 pl-9 pr-3 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-48 max-md:text-base max-md:py-2.5"
                           />
                         </div>
                         <div className="flex items-center gap-2">
@@ -514,7 +521,7 @@ export default function App() {
                     )}
                     <button 
                       onClick={() => setViewMode('edit')}
-                      className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                      className="hidden md:block p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
                     >
                       <X size={24} className="text-zinc-400" />
                     </button>
@@ -583,15 +590,15 @@ export default function App() {
                           }
                         }}
                         className={cn(
-                          "flex flex-col items-start p-6 rounded-2xl border transition-all text-left group cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500",
+                          "flex flex-col items-start p-4 md:p-6 rounded-2xl border transition-all text-left group cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 min-w-0",
                           currentGraphId === graph.id 
                             ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20" 
                             : "border-zinc-200 dark:border-zinc-800 hover:border-indigo-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                         )}
                       >
-                        <div className="flex justify-between w-full items-start mb-1">
-                          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{graph.id}</span>
-                          <div className="flex items-center gap-2">
+                        <div className="flex justify-between w-full items-center md:items-start gap-2 mb-1">
+                          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest truncate min-w-0">{graph.id}</span>
+                          <div className="flex items-center gap-1 md:gap-2 flex-none">
                             {getMetaArea(graph) && (
                               <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">
                                 {getMetaArea(graph)}
@@ -602,7 +609,7 @@ export default function App() {
                                 e.stopPropagation();
                                 setDeleteConfirmationId(graph.id);
                               }}
-                              className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-zinc-400 hover:text-red-500 rounded-lg transition-colors"
+                              className="p-[15px] md:p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-zinc-400 hover:text-red-500 rounded-lg transition-colors"
                               title="Delete Graph"
                             >
                               <Trash2 size={14} />
@@ -613,7 +620,7 @@ export default function App() {
                                 setDefaultGraph(defaultGraphId === graph.id ? null : graph.id);
                               }}
                               className={cn(
-                                "p-1.5 rounded-lg transition-all active:scale-90",
+                                "p-[15px] md:p-1.5 rounded-lg transition-all active:scale-90",
                                 defaultGraphId === graph.id 
                                   ? "bg-amber-100 dark:bg-amber-900/30 text-amber-500" 
                                   : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-amber-500"
@@ -673,8 +680,8 @@ export default function App() {
                 )}
               </div>
             ) : viewMode === 'json' ? (
-              <div className="bg-zinc-900 text-zinc-100 p-8 rounded-3xl font-mono text-sm shadow-2xl border border-zinc-800 flex flex-col h-[calc(100vh-200px)]">
-                <div className="flex justify-between items-center mb-6">
+              <div className="bg-zinc-900 text-zinc-100 p-4 md:p-8 rounded-2xl md:rounded-3xl font-mono text-sm shadow-2xl border border-zinc-800 flex flex-col h-[calc(100dvh-230px)] md:h-[calc(100vh-200px)]">
+                <div className="flex flex-wrap justify-between items-center gap-3 mb-4 md:mb-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
                       <Code size={18} />
@@ -722,52 +729,61 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className={cn(
-                      "group relative bg-white dark:bg-zinc-900 rounded-3xl border transition-all duration-300",
+                      "group relative bg-white dark:bg-zinc-900 rounded-2xl md:rounded-3xl border transition-all duration-300",
                       editingNodeId === node.id ? "border-indigo-500 ring-4 ring-indigo-500/10 shadow-2xl" : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm"
                     )}
                   >
                     {viewMode === 'edit' && (
-                      <div className="absolute -left-10 md:-left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute -left-12 top-1/2 -translate-y-1/2 hidden md:flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => moveNode(index, 'up')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><ChevronUp size={18} /></button>
                         <button onClick={() => moveNode(index, 'down')} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><ChevronDown size={18} /></button>
                       </div>
                     )}
 
-                    <div className="p-8">
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
-                          <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
+                    <div className="p-4 md:p-8">
+                      <div className="flex justify-between items-center md:items-start gap-2 mb-3 md:mb-6 max-md:-mr-2 max-md:-mt-1">
+                        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                          <span className="flex-none px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
+                          <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight max-md:truncate">{stripTags(node.label) || 'Untitled Node'}</h3>
                         </div>
                         {viewMode === 'edit' && (
-                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex flex-none md:gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => toggleNodeVisibility(node.id)}
                               className={cn(
-                                "p-2 rounded-xl transition-colors",
+                                "p-[13px] md:p-2 rounded-xl transition-colors",
                                 node.visible ? "text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30" : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                               )}
                               title={node.visible ? "Visible in Preview" : "Hidden in Preview"}
+                              aria-label={node.visible ? "Visible in Preview" : "Hidden in Preview"}
                             >
-                              <Eye size={18} />
+                              {node.visible ? <Eye size={18} /> : <EyeOff size={18} />}
                             </button>
                             <button
                               onClick={() => setEditingNodeId(node.id)}
-                              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                              className="p-[13px] md:p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                              aria-label="Edit section"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
                               onClick={() => deleteNode(node.id)}
-                              className="p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl text-zinc-500 hover:text-red-600 transition-colors"
+                              className="hidden md:block p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl text-zinc-500 hover:text-red-600 transition-colors"
                             >
                               <Trash2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => setNodeMenuId(node.id)}
+                              className="md:hidden p-[13px] rounded-xl text-zinc-500 active:bg-zinc-100 dark:active:bg-zinc-800"
+                              aria-label="Section actions: move, delete"
+                            >
+                              <MoreHorizontal size={18} />
                             </button>
                           </div>
                         )}
                       </div>
 
-                      <div className="relative">
+                      <div className="relative max-md:overflow-x-auto">
                         <NodeRenderer node={node} />
                         {node.type === 'image' && !hasImageContent(node.info) ? (
                           <div className="py-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400 gap-1">
@@ -791,7 +807,27 @@ export default function App() {
             )}
           </div>
         </div>
+        <MobileBottomNav />
       </main>
+
+      <Sheet
+        open={!!nodeMenuNode}
+        onClose={() => setNodeMenuId(null)}
+        title="Section"
+        subtitle={nodeMenuNode ? stripTags(nodeMenuNode.label) || 'Untitled Node' : undefined}
+      >
+        <SheetAction icon={ChevronUp} label="Move up" disabled={nodeMenuIndex <= 0} onClick={() => moveNode(nodeMenuIndex, 'up')} />
+        <SheetAction icon={ChevronDown} label="Move down" disabled={nodeMenuIndex >= doc.nodes.length - 1} onClick={() => moveNode(nodeMenuIndex, 'down')} />
+        <SheetAction
+          icon={Trash2}
+          label="Delete section"
+          danger
+          onClick={() => {
+            if (nodeMenuNode) deleteNode(nodeMenuNode.id);
+            setNodeMenuId(null);
+          }}
+        />
+      </Sheet>
 
       {/* Reorder Modal */}
       <ReorderModal />

@@ -78,8 +78,11 @@ export const AgentChat: React.FC = () => {
           scale: 1, 
           y: 0, 
           x: 0,
-          width: isMaximized ? 'calc(100% - 2rem)' : '400px',
-          height: isMaximized ? 'calc(100% - 2rem)' : '600px',
+        }}
+        // Sized outside `animate` so it can clamp to a phone viewport.
+        style={{
+          width: isMaximized ? 'calc(100% - 2rem)' : 'min(400px, calc(100% - 2rem))',
+          height: isMaximized ? 'calc(100% - 2rem)' : 'min(600px, calc(100% - 2rem))',
           bottom: '1rem',
           right: '1rem'
         }}
