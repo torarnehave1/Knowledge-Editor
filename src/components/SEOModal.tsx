@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Globe, X, Sparkles, Image as ImageIcon, Check, Copy, ExternalLink, Facebook, Twitter, Loader2, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { Node } from '../types';
+import { slugify, slugForGraph } from '../utils/slugify';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -64,25 +65,23 @@ export default function SEOModal() {
   const [isGeneratingKeywords, setIsGeneratingKeywords] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Seed the form once per open. Depending on doc.metadata here would re-seed on
+  // every store write (AI Generate saves the description into it), wiping
+  // whatever the user had typed into the other fields.
   useEffect(() => {
-    if (isSEOModalOpen && doc.metadata) {
-      setSlug(doc.metadata.seoSlug || doc.metadata.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
-      setTitle(doc.metadata.title || '');
-      setDescription(doc.metadata.seoDescription || '');
-      setKeywords(doc.metadata.seoKeywords || '');
-      
-      // If no OG image is set, try to find the first one in the graph
-      if (!doc.metadata.seoOgImage) {
-        setOgImage(findGraphImage(doc.nodes));
-      } else {
-        setOgImage(doc.metadata.seoOgImage);
-      }
-    }
-  }, [isSEOModalOpen, doc.metadata, doc.nodes]);
+    if (!isSEOModalOpen) return;
+    const { doc: current, currentGraphId: graphId } = useStore.getState();
+    if (!current.metadata) return;
+    setSlug(current.metadata.seoSlug || slugForGraph(current.metadata.title || '', graphId));
+    setTitle(current.metadata.title || '');
+    setDescription(current.metadata.seoDescription || '');
+    setKeywords(current.metadata.seoKeywords || '');
+    // If no OG image is set, try to find the first one in the graph
+    setOgImage(current.metadata.seoOgImage || findGraphImage(current.nodes));
+  }, [isSEOModalOpen]);
 
   const handleAutoSlug = () => {
-    const newSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    setSlug(newSlug);
+    setSlug(slugForGraph(title, currentGraphId));
   };
 
   const handleGenerateDescription = async () => {
@@ -236,6 +235,7 @@ export default function SEOModal() {
                       type="text"
                       value={slug}
                       onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                      onBlur={() => setSlug(slugify(slug))}
                       className={cn(
                         "w-full bg-zinc-50 dark:bg-zinc-950 border rounded-xl pl-16 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all",
                         isValidSlug ? "border-zinc-200 dark:border-zinc-800" : "border-red-500 ring-1 ring-red-500/20"
