@@ -49,6 +49,7 @@ export default function SEOModal() {
     isSEOModalOpen, 
     setIsSEOModalOpen, 
     seoStatus, 
+    error,
     seoUrl, 
     publishSEOPage,
     generateSEODescription,
@@ -383,7 +384,7 @@ export default function SEOModal() {
                 <div className="pt-4">
                   <button 
                     onClick={handlePublish}
-                    disabled={seoStatus === 'generating' || !slug || !title || !isValidSlug}
+                    disabled={seoStatus === 'generating' || !slug || !title || !isValidSlug || !description.trim()}
                     className="w-full py-4 rounded-2xl bg-indigo-600 text-white text-sm font-bold uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     {seoStatus === 'generating' ? (
@@ -398,10 +399,13 @@ export default function SEOModal() {
                       </>
                     )}
                   </button>
+                  {!description.trim() && seoStatus !== 'generating' && (
+                    <p className="text-[10px] text-zinc-500 font-bold mt-3 uppercase tracking-widest text-center">Meta description is required to publish</p>
+                  )}
                   {seoStatus === 'error' && (
                     <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold flex items-center gap-2 border border-red-100 dark:border-red-900/50">
                       <AlertCircle size={14} />
-                      Failed to publish. Please try again.
+                      {error || 'Failed to publish. Please try again.'}
                     </div>
                   )}
                 </div>

@@ -166,7 +166,11 @@ export const knowledgeService = {
     const payload = {
       id,
       graphData: {
+        // The server replaces metadata wholesale, so everything the graph already
+        // carries (seo*, publicationState, semantic*, userId …) has to ride along
+        // or this save erases it.
         metadata: {
+          ...doc.metadata,
           title,
           description,
           createdBy: doc.metadata?.createdBy || 'Knowledge Editor',
@@ -338,7 +342,10 @@ export const knowledgeService = {
       },
       body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error('Failed to generate SEO page');
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ? `SEO page not generated: ${body.error}` : `Failed to generate SEO page (${response.status})`);
+    }
     return await response.json();
   },
 

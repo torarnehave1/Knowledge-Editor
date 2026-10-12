@@ -953,17 +953,17 @@ export const useStore = create<AppState>()(
             publicationState: 'published'
           };
 
-          await get().saveGraph();
-
-          // 3. Update local state
+          // saveGraph persists get().doc, so the SEO fields must be in state first.
           set((state) => ({
             doc: {
               ...state.doc,
               metadata: updatedMetadata as any
-            },
-            seoStatus: 'success',
-            seoUrl: genResult.url
+            }
           }));
+
+          await get().saveGraph();
+
+          set({ seoStatus: 'success', seoUrl: genResult.url });
         } catch (e: any) {
           console.error('SEO Publication failed:', e);
           set({ seoStatus: 'error', error: e.message || 'Failed to publish SEO page' });
