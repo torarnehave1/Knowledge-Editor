@@ -391,11 +391,20 @@ export const useStore = create<AppState>()(
       },
 
       bypassLogin: () => {
+        // Dev server only. import.meta.env.DEV is statically false in a production build, so
+        // this whole body is dropped from the bundle. The token comes from .env.local and
+        // never from source: anything written here ships in the public JavaScript.
+        if (!import.meta.env.DEV) return;
+        const devToken = import.meta.env.VITE_VEGVISR_API_TOKEN;
+        if (!devToken) {
+          set({ error: 'Dev bypass needs VITE_VEGVISR_API_TOKEN in .env.local' });
+          return;
+        }
         const mockUser: User = {
           email: 'dev@vegvisr.org',
           role: 'admin',
           user_id: 'dev-user-id',
-          emailVerificationToken: import.meta.env.VITE_VEGVISR_API_TOKEN || 'b1ca2967e8165ec02fdf039d9e916af4005f7388'
+          emailVerificationToken: devToken
         };
         localStorage.setItem('user', JSON.stringify(mockUser));
         localStorage.setItem('emailVerificationToken', mockUser.emailVerificationToken);

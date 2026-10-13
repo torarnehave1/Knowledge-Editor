@@ -101,22 +101,26 @@ export const Login: React.FC = () => {
               )}
             </button>
 
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-zinc-800"></div>
+            {import.meta.env.DEV && (
+              <>
+              <div className="relative py-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-zinc-800"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-zinc-900 px-2 text-zinc-500">Development Only</span>
+                </div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-zinc-900 px-2 text-zinc-500">Development Only</span>
-              </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={bypassLogin}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2 rounded-xl border border-zinc-700 transition-all text-sm"
-            >
-              Bypass Login (Dev)
-            </button>
+              <button
+                type="button"
+                onClick={bypassLogin}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2 rounded-xl border border-zinc-700 transition-all text-sm"
+              >
+                Bypass Login (Dev)
+              </button>
+              </>
+            )}
           </form>
         )}
 
