@@ -105,3 +105,16 @@ export async function loadBranding(): Promise<void> {
   };
   listeners.forEach((l) => l());
 }
+
+/**
+ * The World this host belongs to — editor.sodesign.no → sodesign.no — once a World's branding has
+ * been applied; null on editor.vegvisr.org and every other host. The editor sends it with every
+ * save: the knowledge-graph worker places a NEW graph in that World's own storage (for the
+ * founder, and for a Superadmin or system owner working for them) and ignores it for a graph that
+ * already exists, which is saved where it lives.
+ */
+export function worldDomain(): string | null {
+  if (!current.world || typeof window === 'undefined') return null;
+  const parts = window.location.hostname.split('.');
+  return parts.length > 2 ? parts.slice(1).join('.') : window.location.hostname;
+}

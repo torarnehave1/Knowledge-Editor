@@ -1,5 +1,6 @@
 
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
+import { worldDomain } from '../branding';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
 // Every call carries the SIGNED-IN USER's own token — the one the magic-link login stored.
@@ -205,7 +206,9 @@ export const knowledgeService = {
         }),
         edges: doc.edges || []
       },
-      override
+      override,
+      // On a World's own host, a NEW graph is stored in that World; an existing one stays put.
+      ...(worldDomain() ? { world: worldDomain() } : {})
     };
 
     const response = await fetch(`${API_BASE_URL}/saveGraphWithHistory`, {
