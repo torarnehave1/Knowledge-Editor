@@ -425,11 +425,16 @@ export const useStore = create<AppState>()(
             if (verifyData.success && verifyData.email) {
               const email = verifyData.email;
               
-              // Step 2: Get the REAL permanent token and user_id from the new backend
+              // Step 2: user_id for this account. The verified magic link is the proof: its
+              // response carries the account's token (apiToken), and get-auth-token answers only
+              // a caller that presents it. It used to answer anyone who named an e-mail address,
+              // which handed out every user's session token (closed 2026-10-15).
+              if (!verifyData.apiToken) throw new Error('Magic-link verification returned no token');
               const tokenRes = await fetch('https://api.vegvisr.org/get-auth-token', {
                 method: 'GET',
                 headers: {
-                  'X-Email': email
+                  'X-Email': email,
+                  'X-API-Token': verifyData.apiToken
                 }
               });
               
