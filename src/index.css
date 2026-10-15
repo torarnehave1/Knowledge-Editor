@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* dark: follows the system setting, except on a World host that asked for light mode
+   (branding.ts adds .world-light to <html>): there no dark: variant applies. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not(.world-light, .world-light *)) {
+      @slot;
+    }
+  }
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;

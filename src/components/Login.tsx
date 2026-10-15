@@ -20,6 +20,21 @@ export const Login: React.FC = () => {
     }
   };
 
+  if (brand.world) {
+    return (
+      <WorldLogin
+        brand={brand}
+        email={email}
+        setEmail={setEmail}
+        isSent={isSent}
+        setIsSent={setIsSent}
+        isLoading={isLoading}
+        error={error}
+        onSubmit={handleSubmit}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-950 p-4">
       <motion.div 
@@ -135,3 +150,104 @@ export const Login: React.FC = () => {
     </div>
   );
 };
+
+// ── The login a World's own host shows (G8, 2026-10-15) ───────────────────────────────────────
+// Same flow, the World's look: its surface colour, a light card, its accent on the action, its
+// heading font, its language. Colours come from the CSS variables branding.ts set from the World's
+// /branding.json, so nothing here is specific to one World.
+
+const WORLD_COPY = {
+  no: {
+    heading: 'Logg inn',
+    lead: 'Skriv inn e-postadressen din, så sender vi deg en innloggingslenke.',
+    label: 'E-postadresse',
+    placeholder: 'navn@eksempel.no',
+    send: 'Send innloggingslenke',
+    sending: 'Sender lenke …',
+    sentTitle: 'Lenken er sendt',
+    sentBody: (e: string) => `Sjekk innboksen til ${e} og klikk på lenken for å logge inn.`,
+    again: 'Bruk en annen e-postadresse',
+  },
+  en: {
+    heading: 'Sign in',
+    lead: 'Enter your email and we will send you a sign-in link.',
+    label: 'Email address',
+    placeholder: 'name@example.com',
+    send: 'Send sign-in link',
+    sending: 'Sending link …',
+    sentTitle: 'Link sent',
+    sentBody: (e: string) => `Check the inbox of ${e} and click the link to sign in.`,
+    again: 'Use another email address',
+  },
+};
+
+function WorldLogin({ brand, email, setEmail, isSent, setIsSent, isLoading, error, onSubmit }: {
+  brand: ReturnType<typeof useBrand>;
+  email: string;
+  setEmail: (v: string) => void;
+  isSent: boolean;
+  setIsSent: (v: boolean) => void;
+  isLoading: boolean;
+  error: string | null;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  const t = WORLD_COPY[brand.lang];
+  const ink = { color: 'var(--color-ink)' };
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--brand-surface, #f4f4f5)' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-white rounded-2xl p-8 shadow-xl"
+      >
+        <div className="flex justify-center mb-6">
+          <img src={brand.logoUrl} alt={`${brand.name} logo`} className="h-20 w-auto" referrerPolicy="no-referrer" />
+        </div>
+        <h1 className="text-3xl font-bold text-center mb-2" style={{ ...ink, fontFamily: 'var(--font-display, var(--font-sans))' }}>
+          {t.heading}
+        </h1>
+        <p className="text-center mb-8 opacity-75" style={ink}>{t.lead}</p>
+
+        {isSent ? (
+          <div className="rounded-xl p-6 text-center border" style={{ borderColor: 'var(--color-accent)', ...ink }}>
+            <CheckCircle2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-accent)' }} />
+            <h2 className="font-semibold mb-2">{t.sentTitle}</h2>
+            <p className="text-sm opacity-80">{t.sentBody(email)}</p>
+            <button onClick={() => setIsSent(false)} className="mt-6 text-sm underline opacity-70 hover:opacity-100">
+              {t.again}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-2" style={ink}>{t.label}</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 opacity-50" style={ink} />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t.placeholder}
+                  className="w-full bg-white border border-zinc-300 rounded-xl py-3 pl-12 pr-4 placeholder:text-zinc-400 focus:outline-none focus:ring-2 transition-all"
+                  style={{ ...ink, ['--tw-ring-color' as string]: 'var(--color-accent)' }}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            {error && <p className="text-red-700 text-sm bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
+            <button
+              type="submit"
+              disabled={isLoading || !email.trim()}
+              className="w-full text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: 'var(--color-accent)' }}
+            >
+              {isLoading ? (<><Loader2 className="w-5 h-5 animate-spin" />{t.sending}</>) : t.send}
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+}

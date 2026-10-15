@@ -42,7 +42,7 @@ export default function Sidebar() {
           <img 
             src={brand.logoUrl} 
             alt="Logo" 
-            className="w-8 h-8 rounded-lg shadow-sm"
+            className={brand.world ? "w-8 h-8 object-contain" : "w-8 h-8 rounded-lg shadow-sm"}
             referrerPolicy="no-referrer"
           />
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{brand.name}</h1>
@@ -50,10 +50,11 @@ export default function Sidebar() {
         <p className="text-xs text-zinc-500 font-medium mb-4">{brand.tagline}</p>
         <button
           onClick={() => setIsNewGraphModalOpen(true)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-500 hover:brightness-110 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+          style={brand.world ? { backgroundColor: 'var(--color-accent)', boxShadow: 'none' } : undefined}
         >
           <Plus size={16} />
-          NEW GRAPH
+          {brand.lang === 'no' ? 'NY GRAF' : 'NEW GRAPH'}
         </button>
       </div>
 

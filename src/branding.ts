@@ -13,7 +13,11 @@
  *   branding.theme.editor = {
  *     fontsCssUrl,          a Google Fonts stylesheet URL
  *     fontSans, fontUi,     CSS font-family values
+ *     fontDisplay,          CSS font-family for headings (login title)
  *     accent, ink           colours for the --color-accent / --color-ink tokens
+ *     surface               the page colour behind the login card (--brand-surface)
+ *     scheme                'light' forces light mode on this host (dark: variants off)
+ *     lang                  'no' | 'en' — language of the login and primary actions
  *   }
  */
 import { useSyncExternalStore } from 'react';
@@ -23,6 +27,7 @@ export interface Brand {
   tagline: string;
   logoUrl: string;
   world: boolean; // true when a World's branding is applied
+  lang: 'no' | 'en';
 }
 
 const DEFAULT_BRAND: Brand = {
@@ -30,6 +35,7 @@ const DEFAULT_BRAND: Brand = {
   tagline: 'Build structured documents',
   logoUrl: 'https://favicons.vegvisr.org/favicons/1774177136217-1-1774177138248-512x512.png',
   world: false,
+  lang: 'en',
 };
 
 let current: Brand = DEFAULT_BRAND;
@@ -78,8 +84,13 @@ export async function loadBranding(): Promise<void> {
   }
   if (editor.fontSans) root.setProperty('--font-sans', editor.fontSans);
   if (editor.fontUi || editor.fontSans) root.setProperty('--font-ui', editor.fontUi || editor.fontSans);
+  if (editor.fontDisplay) root.setProperty('--font-display', editor.fontDisplay);
   if (editor.accent) root.setProperty('--color-accent', editor.accent);
   if (editor.ink) root.setProperty('--color-ink', editor.ink);
+  if (editor.surface) root.setProperty('--brand-surface', editor.surface);
+  // Light mode on a World host that asks for it: index.css turns every dark: variant off under
+  // .world-light, whatever the visitor's system setting is.
+  if (editor.scheme === 'light') document.documentElement.classList.add('world-light');
 
   const name = data?.brand?.name || DEFAULT_BRAND.name;
   if (data?.meta?.title || name) document.title = data?.meta?.title || name;
@@ -90,6 +101,7 @@ export async function loadBranding(): Promise<void> {
     tagline: data?.brand?.slogan || '',
     logoUrl: data?.brand?.logoUrl || DEFAULT_BRAND.logoUrl,
     world: true,
+    lang: editor.lang === 'no' ? 'no' : 'en',
   };
   listeners.forEach((l) => l());
 }
