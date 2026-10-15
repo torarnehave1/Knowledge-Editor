@@ -5,12 +5,14 @@ import { useState } from 'react';
 import { nodeTypes, useAddSection } from './addSection';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useBrand } from '../branding';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function Sidebar() {
+  const brand = useBrand();
   const { 
     viewMode, 
     setViewMode, 
@@ -38,14 +40,14 @@ export default function Sidebar() {
       <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-3 mb-1">
           <img 
-            src="https://favicons.vegvisr.org/favicons/1774177136217-1-1774177138248-512x512.png" 
+            src={brand.logoUrl} 
             alt="Logo" 
             className="w-8 h-8 rounded-lg shadow-sm"
             referrerPolicy="no-referrer"
           />
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Knowledge Editor</h1>
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{brand.name}</h1>
         </div>
-        <p className="text-xs text-zinc-500 font-medium mb-4">Build structured documents</p>
+        <p className="text-xs text-zinc-500 font-medium mb-4">{brand.tagline}</p>
         <button
           onClick={() => setIsNewGraphModalOpen(true)}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"

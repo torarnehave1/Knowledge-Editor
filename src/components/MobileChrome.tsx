@@ -8,6 +8,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useStore } from '../store/useStore';
 import { nodeTypes, useAddSection } from './addSection';
+import { useBrand } from '../branding';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -84,6 +85,7 @@ export function SheetAction({ icon: Icon, label, onClick, danger, disabled }: {
 }
 
 export function MobileHeader() {
+  const brand = useBrand();
   const {
     doc, viewMode, setViewMode, currentGraphId, saveGraph, saveStatus, error, setError, user, logout,
     setIsVersionHistoryModalOpen, setIsSEOModalOpen, setIsTranslationModalOpen, togglePublicationState,
@@ -100,7 +102,7 @@ export function MobileHeader() {
         {isGraphs ? (
           <>
             <img
-              src="https://favicons.vegvisr.org/favicons/1774177136217-1-1774177138248-512x512.png"
+              src={brand.logoUrl}
               alt=""
               className="size-8 rounded-lg ml-3 mr-2"
               referrerPolicy="no-referrer"
