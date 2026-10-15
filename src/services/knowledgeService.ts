@@ -2,9 +2,18 @@
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
-const API_TOKEN = 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
-
-const getApiToken = () => API_TOKEN;
+// Every call carries the SIGNED-IN USER's own token — the one the magic-link login stored.
+// Until 2026-10-15 a single hard-coded token, readable in the public bundle, was sent for every
+// user: the knowledge-graph worker then saw "the editor", never the person, so it could not keep
+// a World Founder's own graphs (stored in their World) to that founder, and anyone holding the
+// bundle held a working write token. No token (signed out) sends none; the app asks for login.
+const getApiToken = () => {
+  try {
+    return localStorage.getItem('emailVerificationToken') || '';
+  } catch {
+    return '';
+  }
+};
 
 // Canonical contact-form template row in graphTemplates (vegvisr_org D1).
 // Single source of truth for the "Kontaktskjema" html-node — do not inline the

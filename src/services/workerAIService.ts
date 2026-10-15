@@ -2,7 +2,14 @@
 import { KnowledgeDocument } from '../types';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
-const API_TOKEN = 'gemini-3153b1233a9fa463f9749003fc97f5890c0d80cc0759cf5abed8c8024c5b94ac';
+// The signed-in user's own token, as in knowledgeService.ts — never a shared one (2026-10-15).
+const apiToken = () => {
+  try {
+    return localStorage.getItem('emailVerificationToken') || '';
+  } catch {
+    return '';
+  }
+};
 
 export interface WorkerAIRequest {
   prompt: string;
@@ -22,7 +29,7 @@ export const workerAIService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Token': API_TOKEN
+          'X-API-Token': apiToken()
         },
         body: JSON.stringify(payload),
         signal: controller.signal
@@ -51,7 +58,7 @@ export const workerAIService = {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Token': API_TOKEN
+          'X-API-Token': apiToken()
         },
         body: JSON.stringify({ id, ...metadata }),
         signal: controller.signal
