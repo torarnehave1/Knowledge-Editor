@@ -4,18 +4,26 @@ import { Mail, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useBrand } from '../branding';
 
-export const Login: React.FC = () => {
+// `privateGraph`: shown on /view when a graph was refused because nobody is signed in. The
+// refusal (a 401/403 from the knowledge worker) is replaced by a plain sentence.
+export const Login: React.FC<{ privateGraph?: boolean }> = ({ privateGraph = false }) => {
   const brand = useBrand();
   const [email, setEmail] = useState('');
   const [isSent, setIsSent] = useState(false);
-  const { login, bypassLogin, isLoading, error } = useStore();
+  const { login, bypassLogin, isLoading, error: storeError } = useStore();
+  const refusal = !!storeError && /\((401|403)\)/.test(storeError);
+  const error = privateGraph && refusal ? null : storeError;
+  const notice = privateGraph
+    ? (brand.lang === 'no' ? 'Denne grafen er privat. Logg inn for å se den.' : 'This graph is private. Sign in to see it.')
+    : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     
     await login(email);
-    if (!error) {
+    // The error AFTER the attempt — the one captured at render can be an earlier refusal.
+    if (!useStore.getState().error) {
       setIsSent(true);
     }
   };
@@ -30,6 +38,7 @@ export const Login: React.FC = () => {
         setIsSent={setIsSent}
         isLoading={isLoading}
         error={error}
+        notice={notice}
         onSubmit={handleSubmit}
       />
     );
@@ -97,6 +106,7 @@ export const Login: React.FC = () => {
               </div>
             </div>
 
+            {notice && <p className="text-zinc-300 text-sm">{notice}</p>}
             {error && (
               <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg p-3">
                 {error}
@@ -181,7 +191,7 @@ const WORLD_COPY = {
   },
 };
 
-function WorldLogin({ brand, email, setEmail, isSent, setIsSent, isLoading, error, onSubmit }: {
+function WorldLogin({ brand, email, setEmail, isSent, setIsSent, isLoading, error, notice, onSubmit }: {
   brand: ReturnType<typeof useBrand>;
   email: string;
   setEmail: (v: string) => void;
@@ -189,6 +199,7 @@ function WorldLogin({ brand, email, setEmail, isSent, setIsSent, isLoading, erro
   setIsSent: (v: boolean) => void;
   isLoading: boolean;
   error: string | null;
+  notice?: string | null;
   onSubmit: (e: React.FormEvent) => void;
 }) {
   const t = WORLD_COPY[brand.lang];
@@ -236,6 +247,7 @@ function WorldLogin({ brand, email, setEmail, isSent, setIsSent, isLoading, erro
                 />
               </div>
             </div>
+            {notice && <p className="text-sm" style={ink}>{notice}</p>}
             {error && <p className="text-red-700 text-sm bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
             <button
               type="submit"

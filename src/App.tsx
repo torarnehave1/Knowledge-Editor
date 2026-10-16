@@ -211,7 +211,7 @@ export default function App() {
           ) : error && /\((401|403)\)/.test(error) && !localStorage.getItem('emailVerificationToken') ? (
             // Refused because nobody is signed in: a private graph (or one stored in a World)
             // is never shown anonymously. Offer sign-in; the link comes back to this /view address.
-            <Login />
+            <Login privateGraph />
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
               <AlertCircle size={40} />
