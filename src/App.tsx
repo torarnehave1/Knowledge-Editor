@@ -140,6 +140,10 @@ export default function App() {
     if (!isViewMode) {
       checkAuth();
       fetchAvailableModels();
+    } else if (params.get('magic')) {
+      // A sign-in link that returns to /view (a private graph, e.g. one stored in a World):
+      // finish the sign-in here; checkAuth keeps the path and loads the graph.
+      checkAuth();
     }
   }, [checkAuth, fetchAvailableModels, isViewMode]);
 
@@ -204,6 +208,10 @@ export default function App() {
               <Loader2 size={40} className="text-indigo-600 animate-spin" />
               <p className="text-zinc-500 font-medium">Loading content...</p>
             </div>
+          ) : error && /\((401|403)\)/.test(error) && !localStorage.getItem('emailVerificationToken') ? (
+            // Refused because nobody is signed in: a private graph (or one stored in a World)
+            // is never shown anonymously. Offer sign-in; the link comes back to this /view address.
+            <Login />
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
               <AlertCircle size={40} />
