@@ -153,6 +153,16 @@ export default function App() {
     }
   }, [isViewMode, graphId, currentGraphId, loadGraph]);
 
+  // /view refused because nobody is signed in: keep the sign-in form up until the user IS signed
+  // in. Asking for the link clears the store's error, and without this the page fell back to the
+  // built-in demo document (2026-10-16).
+  const [viewNeedsLogin, setViewNeedsLogin] = useState(false);
+  useEffect(() => {
+    if (isViewMode && error && /\((401|403)\)/.test(error) && !localStorage.getItem('emailVerificationToken')) {
+      setViewNeedsLogin(true);
+    }
+  }, [isViewMode, error]);
+
   useEffect(() => {
     if (viewMode === 'json') {
       setJsonValue(JSON.stringify(doc, null, 2));
@@ -203,15 +213,17 @@ export default function App() {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto space-y-8">
-          {isLoading ? (
+          {viewNeedsLogin && !localStorage.getItem('emailVerificationToken') ? (
+            // Refused because nobody is signed in: a private graph (or one stored in a World)
+            // is never shown anonymously. Offer sign-in; the link comes back to this /view address.
+            // Before the spinner: sending the link sets isLoading, and the form must keep its state.
+            <Login privateGraph />
+          ) : isLoading || (!error && currentGraphId !== graphId) ? (
+            // Only the graph named in the address is ever shown — never the built-in demo document.
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 size={40} className="text-indigo-600 animate-spin" />
               <p className="text-zinc-500 font-medium">Loading content...</p>
             </div>
-          ) : error && /\((401|403)\)/.test(error) && !localStorage.getItem('emailVerificationToken') ? (
-            // Refused because nobody is signed in: a private graph (or one stored in a World)
-            // is never shown anonymously. Offer sign-in; the link comes back to this /view address.
-            <Login privateGraph />
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
               <AlertCircle size={40} />
