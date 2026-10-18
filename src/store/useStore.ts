@@ -157,6 +157,8 @@ interface AppState {
   // Document State
   doc: KnowledgeDocument;
   currentGraphId: string | null;
+  // The World the open graph lives in (X-Graph-World), or null — selects its own node types.
+  graphWorld: string | null;
   viewMode: ViewMode;
   jsonValue: string;
   
@@ -282,6 +284,7 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       doc: INITIAL_DATA,
       currentGraphId: null,
+      graphWorld: null,
       viewMode: 'edit',
       jsonValue: '',
       graphList: [],
@@ -558,7 +561,7 @@ export const useStore = create<AppState>()(
       },
 
       loadGraph: async (id) => {
-        set({ isLoading: true, error: null, currentGraphId: id });
+        set({ isLoading: true, error: null, currentGraphId: id, graphWorld: null });
         // Keep the open graph in the URL so a refresh restores it.
         // The /view path has its own graphId handling — leave it alone.
         if (window.location.pathname !== '/view') {
@@ -568,7 +571,7 @@ export const useStore = create<AppState>()(
         }
         try {
           const data = await knowledgeService.getGraph(id);
-          set({ doc: data, viewMode: 'edit' });
+          set({ doc: data, viewMode: 'edit', graphWorld: knowledgeService.graphWorld(id) });
           // Remember this as the last graph worked on (survives a fresh login
           // where the URL carries no graphId). Only persisted on success.
           localStorage.setItem('lastGraphId', id);

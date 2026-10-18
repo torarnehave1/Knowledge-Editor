@@ -3,7 +3,10 @@ import { KnowledgeDocument, Node, GraphListItem } from '../types';
 import { worldDomain } from '../branding';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
-let nodeTypesPromise: Promise<string[]> | null = null;
+const nodeTypesPromises = new Map<string, Promise<string[]>>(); // world ('' = platform) -> types
+// The World each read graph lives in (getknowgraph's X-Graph-World header), so its own node
+// types render and can be picked (rendering engine phase 2, 2026-10-18).
+const graphWorlds = new Map<string, string | null>();
 // Every call carries the SIGNED-IN USER's own token — the one the magic-link login stored.
 // Until 2026-10-15 a single hard-coded token, readable in the public bundle, was sent for every
 // user: the knowledge-graph worker then saw "the editor", never the person, so it could not keep
@@ -129,6 +132,7 @@ export const knowledgeService = {
           'X-API-Token': getApiToken()
         }
       });
+      graphWorlds.set(id, response.headers.get('X-Graph-World'));
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -169,16 +173,24 @@ export const knowledgeService = {
     }
   },
 
-  // Node types the platform knows (registry-driven): { renderable, registered, all }.
+  /** The World a graph read by getGraph lives in, or null (the platform). */
+  graphWorld(id: string): string | null {
+    return graphWorlds.get(id) || null;
+  },
+
+  // Node types the platform knows (registry-driven): { renderable, registered, all }. With a
+  // World, that World's own types are added (they are valid only in its graphs).
   // Cached for the page's lifetime; a failure yields [] so the editor falls back.
-  async getNodeTypes(): Promise<string[]> {
-    if (!nodeTypesPromise) {
-      nodeTypesPromise = fetch(`${API_BASE_URL}/node-types`)
+  async getNodeTypes(world: string | null = null): Promise<string[]> {
+    const key = world || '';
+    if (!nodeTypesPromises.has(key)) {
+      const q = key ? `?world=${encodeURIComponent(key)}` : '';
+      nodeTypesPromises.set(key, fetch(`${API_BASE_URL}/node-types${q}`)
         .then(r => (r.ok ? r.json() : null))
         .then(data => (Array.isArray(data?.all) ? data.all.filter((t: unknown) => typeof t === 'string') : []))
-        .catch(() => { nodeTypesPromise = null; return []; });
+        .catch(() => { nodeTypesPromises.delete(key); return []; }));
     }
-    return nodeTypesPromise;
+    return nodeTypesPromises.get(key)!;
   },
 
   async saveGraph(id: string, doc: KnowledgeDocument, override: boolean = false): Promise<SaveResponse> {

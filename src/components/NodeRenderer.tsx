@@ -6,6 +6,7 @@ import { Node } from '../types';
 import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film } from 'lucide-react';
 import { resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 import { RegisteredTypeNode, useApprovedTypes } from '../lib/vegvisrNode';
+import { useStore } from '../store/useStore';
 
 interface NodeRendererProps {
   node: Node;
@@ -75,7 +76,9 @@ function MermaidDiagram({ code }: { code: string }) {
 export default function NodeRenderer({ node }: NodeRendererProps) {
   // Types with an approved renderer in graph_system_registry (the rendering engine). Called before
   // any early return, as hooks must be.
-  const approvedTypes = useApprovedTypes();
+  // With the open graph's World, that World's own types too (phase 2).
+  const world = useStore((s) => s.graphWorld);
+  const approvedTypes = useApprovedTypes(world);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -355,7 +358,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   // iframe. Reached only by types this renderer has no branch for — built-ins are untouched.
   if (node.type && approvedTypes.has(node.type)) {
     const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-    return <RegisteredTypeNode node={{ ...node, metadata: node.metadata || {} }} theme={dark ? 'dark' : 'light'} />;
+    return <RegisteredTypeNode node={{ ...node, metadata: node.metadata || {} }} theme={dark ? 'dark' : 'light'} world={world} />;
   }
 
   // Handle ![Leftside-N|styles](url) / ![Rightside-N|styles](url) — parity

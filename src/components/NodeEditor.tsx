@@ -105,9 +105,10 @@ export default function NodeEditor() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [platformTypes, setPlatformTypes] = useState<string[]>([]);
 
+  const graphWorld = useStore((s) => s.graphWorld);
   useEffect(() => {
-    knowledgeService.getNodeTypes().then(setPlatformTypes);
-  }, []);
+    knowledgeService.getNodeTypes(graphWorld).then(setPlatformTypes);
+  }, [graphWorld]);
 
   // The node's own type is always an option, so opening a node never changes its type.
   const typeOptions = Array.from(new Set([
