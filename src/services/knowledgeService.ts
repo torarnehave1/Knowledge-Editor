@@ -3,6 +3,7 @@ import { KnowledgeDocument, Node, GraphListItem } from '../types';
 import { worldDomain } from '../branding';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
+let nodeTypesPromise: Promise<string[]> | null = null;
 // Every call carries the SIGNED-IN USER's own token — the one the magic-link login stored.
 // Until 2026-10-15 a single hard-coded token, readable in the public bundle, was sent for every
 // user: the knowledge-graph worker then saw "the editor", never the person, so it could not keep
@@ -168,6 +169,18 @@ export const knowledgeService = {
     }
   },
 
+  // Node types the platform knows (registry-driven): { renderable, registered, all }.
+  // Cached for the page's lifetime; a failure yields [] so the editor falls back.
+  async getNodeTypes(): Promise<string[]> {
+    if (!nodeTypesPromise) {
+      nodeTypesPromise = fetch(`${API_BASE_URL}/node-types`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => (Array.isArray(data?.all) ? data.all.filter((t: unknown) => typeof t === 'string') : []))
+        .catch(() => { nodeTypesPromise = null; return []; });
+    }
+    return nodeTypesPromise;
+  },
+
   async saveGraph(id: string, doc: KnowledgeDocument, override: boolean = false): Promise<SaveResponse> {
     const nodes = doc.nodes || [];
     const title = doc.metadata?.title || nodes.find(n => n.type === 'title')?.label || 'Untitled Graph';
@@ -187,21 +200,20 @@ export const knowledgeService = {
           version: doc.metadata?.version || 0,
           metaArea: doc.metadata?.metaArea || ''
         },
+        // Same rule per node: spread the loaded node so every field this editor
+        // does not own (metadata, commentaries, position, publishGate …) survives,
+        // then normalise only the fields the editor edits.
         nodes: nodes.map(node => {
           const w = parseInt(node.imageWidth as any);
           const h = parseInt(node.imageHeight as any);
           return {
-            id: node.id,
-            label: node.label,
-            color: node.color,
-            type: node.type,
+            ...node,
             info: node.info || '',
             bibl: node.bibl || [],
-            visible: node.visible,
             imageWidth: isNaN(w) ? null : w,
             imageHeight: isNaN(h) ? null : h,
-            path: node.path,
-            position: { x: 0, y: 0 } // Default position as app is linear but API expects it
+            // The app is linear, but the API expects a position; keep a real one.
+            position: node.position || { x: 0, y: 0 }
           };
         }),
         edges: doc.edges || []

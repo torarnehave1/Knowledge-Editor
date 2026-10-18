@@ -10,6 +10,7 @@ import ContactRoutingSection from './ContactRoutingSection';
 import RealtimeVideoPicker from './RealtimeVideoPicker';
 import { buildRealtimeVideoInfo, recordingLabel, resolveRealtimeVideoUrl } from '../services/realtimeVideos';
 import getCaretCoordinates from 'textarea-caret';
+import { knowledgeService } from '../services/knowledgeService';
 import { uploadImage, isImageFile, looksLikeImageUrl, imageUrlFromDataTransfer, imageFileFromClipboard, buildImageSnippet, altTextFor } from '../services/imageUpload';
 
 function cn(...inputs: ClassValue[]) {
@@ -68,6 +69,21 @@ const SUGGESTIONS: TagSuggestion[] = [
   },
 ];
 
+// Friendly labels for the common types; every other type shows its raw name.
+const TYPE_LABELS: Record<string, string> = {
+  'fulltext': 'Full Text',
+  'notes': 'Notes',
+  'title': 'Title',
+  'info': 'Info',
+  'image': 'Image',
+  'youtube-video': 'YouTube Video',
+  'audio': 'Audio',
+  'realtime-video': 'Realtime Video',
+  'audio-visualizer': 'Audio Visualizer',
+  'REG': 'Registration',
+  'html-node': 'HTML Section',
+};
+
 export default function NodeEditor() {
   const { 
     editingNodeId, 
@@ -87,6 +103,18 @@ export default function NodeEditor() {
   
   const [editedNode, setEditedNode] = useState<Node | null>(node ? { ...node } : null);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [platformTypes, setPlatformTypes] = useState<string[]>([]);
+
+  useEffect(() => {
+    knowledgeService.getNodeTypes().then(setPlatformTypes);
+  }, []);
+
+  // The node's own type is always an option, so opening a node never changes its type.
+  const typeOptions = Array.from(new Set([
+    ...Object.keys(TYPE_LABELS),
+    ...[...platformTypes].sort((a, b) => a.localeCompare(b)),
+    ...(node?.type ? [node.type] : []),
+  ]));
 
   // Sync with store when AI finishes generating
   useEffect(() => {
@@ -464,20 +492,23 @@ export default function NodeEditor() {
               onChange={handleChange}
               className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             >
-              <option value="fulltext">Full Text</option>
-              <option value="notes">Notes</option>
-              <option value="title">Title</option>
-              <option value="info">Info</option>
-              <option value="image">Image</option>
-              <option value="youtube-video">YouTube Video</option>
-              <option value="audio">Audio</option>
-              <option value="realtime-video">Realtime Video</option>
-              <option value="audio-visualizer">Audio Visualizer</option>
-              <option value="REG">Registration</option>
-              <option value="html-node">HTML Section</option>
+              {typeOptions.map(t => (
+                <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>
+              ))}
             </select>
           </div>
         </div>
+
+        {editedNode.metadata && Object.keys(editedNode.metadata).length > 0 && (
+          <details className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
+              Metadata (read-only)
+            </summary>
+            <pre className="max-h-64 overflow-auto px-3 pb-3 text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">
+              {JSON.stringify(editedNode.metadata, null, 2)}
+            </pre>
+          </details>
+        )}
 
         {editedNode.type === 'youtube-video' && (
           <div className="space-y-2">

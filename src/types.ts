@@ -29,6 +29,10 @@ export interface Node {
   path: string | null;
   publicUrl?: string | null;
   commentaries?: Commentary[];
+  position?: { x: number; y: number };
+  // Machine data owned by other tools (work contexts, course lessons, registry
+  // schema …). The editor shows it read-only and must save it back untouched.
+  metadata?: Record<string, any>;
 }
 
 export interface GraphMetadata {
