@@ -106,8 +106,11 @@ export default function NodeEditor() {
   const [platformTypes, setPlatformTypes] = useState<string[]>([]);
 
   const graphWorld = useStore((s) => s.graphWorld);
+  // A World's own types: their shown names and fields (the form below).
+  const [worldTypeInfo, setWorldTypeInfo] = useState<Record<string, { title: string; fields: { key: string; label: string; kind: string }[] }>>({});
   useEffect(() => {
     knowledgeService.getNodeTypes(graphWorld).then(setPlatformTypes);
+    knowledgeService.getWorldTypeInfo(graphWorld).then(setWorldTypeInfo);
   }, [graphWorld]);
 
   // The node's own type is always an option, so opening a node never changes its type.
@@ -494,13 +497,49 @@ export default function NodeEditor() {
               className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             >
               {typeOptions.map(t => (
-                <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>
+                <option key={t} value={t}>{TYPE_LABELS[t] || worldTypeInfo[t]?.title || t}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {editedNode.metadata && Object.keys(editedNode.metadata).length > 0 && (
+        {/* A World's own node type with fields (Nodetyper, 2026-10-18): its values live in
+            metadata[<field key>] and are edited here as a form; other metadata keys are kept. */}
+        {(worldTypeInfo[editedNode.type]?.fields?.length ?? 0) > 0 && (
+          <div className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3" data-type-form={editedNode.type}>
+            <div className="text-xs font-bold uppercase tracking-wider text-zinc-500">{worldTypeInfo[editedNode.type].title}</div>
+            {worldTypeInfo[editedNode.type].fields.map((f) => {
+              const raw = (editedNode.metadata as Record<string, unknown> | undefined)?.[f.key];
+              const value = raw == null ? '' : String(raw);
+              const set = (v: string) => setEditedNode(prev => {
+                if (!prev) return null;
+                const md = { ...((prev.metadata as Record<string, unknown>) || {}) };
+                if (v === '') delete md[f.key];
+                else md[f.key] = f.kind === 'number' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : v;
+                return { ...prev, metadata: md };
+              });
+              const cls = 'w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none';
+              return (
+                <div key={f.key} className="space-y-1">
+                  <label className="text-xs text-zinc-500" htmlFor={`f-${f.key}`}>{f.label}</label>
+                  {f.kind === 'longtext'
+                    ? <textarea id={`f-${f.key}`} data-field={f.key} rows={3} value={value} onChange={(e) => set(e.target.value)} className={cls} />
+                    : <input
+                        id={`f-${f.key}`}
+                        data-field={f.key}
+                        type={f.kind === 'number' ? 'number' : f.kind === 'date' ? 'date' : f.kind === 'link' || f.kind === 'image' ? 'url' : 'text'}
+                        placeholder={f.kind === 'image' ? 'https://… (bildeadresse)' : f.kind === 'link' ? 'https://…' : ''}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                        className={cls}
+                      />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {editedNode.metadata && Object.keys(editedNode.metadata).length > 0 && (worldTypeInfo[editedNode.type]?.fields?.length ?? 0) === 0 && (
           <details className="rounded-lg border border-zinc-200 dark:border-zinc-800">
             <summary className="cursor-pointer px-3 py-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
               Metadata (read-only)

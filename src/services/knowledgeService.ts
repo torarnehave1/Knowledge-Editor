@@ -173,6 +173,21 @@ export const knowledgeService = {
     }
   },
 
+  /**
+   * A World's own node types with their shown title and fields — so a node of such a type is
+   * edited as a form (Nodetyper, 2026-10-18). {} for the platform or when it cannot be read.
+   */
+  async getWorldTypeInfo(world: string | null): Promise<Record<string, { title: string; fields: { key: string; label: string; kind: string }[] }>> {
+    if (!world) return {};
+    try {
+      const r = await fetch(`${API_BASE_URL}/node-types?world=${encodeURIComponent(world)}`);
+      const data = r.ok ? await r.json() : null;
+      return (data && typeof data.worldTypeInfo === 'object' && data.worldTypeInfo) || {};
+    } catch {
+      return {};
+    }
+  },
+
   /** The World a graph read by getGraph lives in, or null (the platform). */
   graphWorld(id: string): string | null {
     return graphWorlds.get(id) || null;
