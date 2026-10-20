@@ -47,6 +47,9 @@ export interface GraphMetadata {
   seoKeywords?: string;
   publicationState?: 'draft' | 'published';
   publishedAt?: string | null;
+  // Set by the password-protection node; passwordHash is btoa(password).
+  passwordProtected?: boolean;
+  passwordHash?: string | null;
 }
 
 export interface GraphListItem {

@@ -22,6 +22,7 @@ import { TranslationModal } from './components/TranslationModal';
 import { AgentModal } from './components/AgentModal';
 import { AgentChat } from './components/AgentChat';
 import { Login } from './components/Login';
+import { ViewPasswordGate, isGraphPasswordProtected, hasGraphPasswordSession } from './components/ViewPasswordGate';
 import { useStore } from './store/useStore';
 import { LogOut } from 'lucide-react';
 
@@ -209,6 +210,10 @@ export default function App() {
   const nodeMenuIndex = doc.nodes.findIndex(n => n.id === nodeMenuId);
   const nodeMenuNode = nodeMenuIndex >= 0 ? doc.nodes[nodeMenuIndex] : null;
 
+  // /view of a password-protected graph shows the password form until it is unlocked.
+  const [passwordUnlocked, setPasswordUnlocked] = useState(() => !!graphId && hasGraphPasswordSession(graphId));
+  const viewLocked = isViewMode && !passwordUnlocked && isGraphPasswordProtected(doc.metadata);
+
   if (isViewMode) {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-y-auto p-8">
@@ -229,6 +234,13 @@ export default function App() {
               <AlertCircle size={40} />
               <p className="font-medium">{error}</p>
             </div>
+          ) : viewLocked ? (
+            <ViewPasswordGate
+              graphId={graphId!}
+              title={doc.metadata?.title}
+              passwordHash={doc.metadata?.passwordHash || ''}
+              onUnlocked={() => setPasswordUnlocked(true)}
+            />
           ) : (
             <>
               <header className="mb-12 text-center">
