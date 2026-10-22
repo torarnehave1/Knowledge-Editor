@@ -1,6 +1,7 @@
 
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 import { worldDomain } from '../branding';
+import { sortNodesByOrder } from '../utils/nodeOrder';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
 const nodeTypesPromises = new Map<string, Promise<string[]>>(); // world ('' = platform) -> types
@@ -159,6 +160,8 @@ export const knowledgeService = {
         if (!Array.isArray(data.nodes)) data.nodes = [];
         if (!Array.isArray(data.edges)) data.edges = [];
         if (!data.metadata) data.metadata = { title: 'Untitled Graph', description: '' };
+        // Show the nodes in the same reading order as every other viewer (node.order).
+        data.nodes = sortNodesByOrder(data.nodes);
       }
       
       return data;
@@ -356,6 +359,7 @@ export const knowledgeService = {
           if (!Array.isArray(data.nodes)) data.nodes = [];
           if (!Array.isArray(data.edges)) data.edges = [];
           if (!data.metadata) data.metadata = { title: 'Untitled Graph', description: '' };
+          data.nodes = sortNodesByOrder(data.nodes);
         }
         return data;
       } catch (parseError) {

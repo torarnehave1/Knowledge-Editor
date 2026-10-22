@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { Node, KnowledgeDocument, NodeType, GraphListItem, User, Agent, AgentMessage, AgentLog } from '../types';
 import { knowledgeService, MetaAreaItem } from '../services/knowledgeService';
+import { renumberNodes } from '../utils/nodeOrder';
 import { askGemini } from '../services/geminiService';
 import { chatWithAgent, generateAgentAvatar } from '../services/agentService';
 import { workerAIService } from '../services/workerAIService';
@@ -1379,7 +1380,8 @@ export const useStore = create<AppState>()(
           const targetIndex = direction === 'up' ? index - 1 : index + 1;
           if (targetIndex < 0 || targetIndex >= newNodes.length) return state;
           [newNodes[index], newNodes[targetIndex]] = [newNodes[targetIndex], newNodes[index]];
-          return { doc: { ...state.doc, nodes: newNodes } };
+          // Keep `order` in step with the array, so the viewers that sort by it agree.
+          return { doc: { ...state.doc, nodes: renumberNodes(newNodes) } };
         });
         
         // Auto-save
@@ -1389,7 +1391,7 @@ export const useStore = create<AppState>()(
       },
 
       setNodes: (nodes) => {
-        set((state) => ({ doc: { ...state.doc, nodes } }));
+        set((state) => ({ doc: { ...state.doc, nodes: renumberNodes(nodes) } }));
         
         // Auto-save
         if (get().currentGraphId) {

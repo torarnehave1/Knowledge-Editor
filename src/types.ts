@@ -30,6 +30,9 @@ export interface Node {
   publicUrl?: string | null;
   commentaries?: Commentary[];
   position?: { x: number; y: number };
+  // Reading order, shared with GNewViewer and graph-portfolio (1 = top). A node without one
+  // falls back to its array position. See sortNodesByOrder / renumberNodes.
+  order?: number;
   // Machine data owned by other tools (work contexts, course lessons, registry
   // schema …). The editor shows it read-only and must save it back untouched.
   metadata?: Record<string, any>;
