@@ -275,6 +275,7 @@ interface AppState {
   saveNode: (updatedNode: Node) => void;
   deleteNode: (id: string) => void;
   toggleNodeVisibility: (id: string) => void;
+  toggleNodeCollapsed: (id: string) => void;
   moveNode: (index: number, direction: 'up' | 'down') => void;
   setNodes: (nodes: Node[]) => void;
   updateMetadata: (data: Partial<KnowledgeDocument['metadata']>) => void;
@@ -1368,6 +1369,30 @@ export const useStore = create<AppState>()(
           }
         }));
         
+        // Auto-save
+        if (get().currentGraphId) {
+          get().saveGraph();
+        }
+      },
+
+      // Open/closed is stored on the node itself (metadata.collapsed), so it is the same on
+      // every device, survives reloads, and can be set through the MCP (update_node merges
+      // metadata key by key; null removes a key). Open is the absence of the key, so the
+      // data stays clean and other metadata keys are never touched.
+      toggleNodeCollapsed: (id) => {
+        set((state) => ({
+          doc: {
+            ...state.doc,
+            nodes: state.doc.nodes.map(n => {
+              if (n.id !== id) return n;
+              const metadata = { ...(n.metadata || {}) };
+              if (metadata.collapsed === true) delete metadata.collapsed;
+              else metadata.collapsed = true;
+              return { ...n, metadata };
+            })
+          }
+        }));
+
         // Auto-save
         if (get().currentGraphId) {
           get().saveGraph();

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, Trash2, MoreHorizontal, ChevronUp, ChevronDown, Eye, EyeOff, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
+import { Edit2, Trash2, MoreHorizontal, ChevronUp, ChevronDown, ChevronRight, Eye, EyeOff, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -34,6 +34,10 @@ const hasImageContent = (info?: string | null) =>
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+// A node is closed when its metadata says so (set in the editor or via the MCP's
+// update_node). Open is the default, so nodes without metadata look as before.
+const isNodeCollapsed = (node: Node) => node.metadata?.collapsed === true;
 
 export default function App() {
   const params = new URLSearchParams(window.location.search);
@@ -95,6 +99,7 @@ export default function App() {
     saveNode,
     deleteNode,
     toggleNodeVisibility,
+    toggleNodeCollapsed,
     user,
     logout,
     checkAuth,
@@ -158,6 +163,15 @@ export default function App() {
   // in. Asking for the link clears the store's error, and without this the page fell back to the
   // built-in demo document (2026-10-16).
   const [viewNeedsLogin, setViewNeedsLogin] = useState(false);
+  // /view: readers can open (and close again) a node the owner stored as collapsed. Local
+  // only — a reader never changes the graph, and nothing stored can hide content from them.
+  const [viewToggled, setViewToggled] = useState<Set<string>>(() => new Set());
+  const toggleInView = (id: string) =>
+    setViewToggled(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   useEffect(() => {
     if (isViewMode && error && /\((401|403)\)/.test(error) && !localStorage.getItem('emailVerificationToken')) {
       setViewNeedsLogin(true);
@@ -253,14 +267,28 @@ export default function App() {
               </header>
               {doc.nodes
                 .filter(node => node.visible)
-                .map((node) => (
+                .map((node) => {
+                  const closed = isNodeCollapsed(node) !== viewToggled.has(node.id);
+                  return (
                   <div key={node.id} className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                      <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
-                    </div>
-                    <NodeRenderer node={node} />
+                    {isNodeCollapsed(node) ? (
+                      <button
+                        onClick={() => toggleInView(node.id)}
+                        className={cn("w-full flex items-center gap-3 text-left", !closed && "mb-6")}
+                        aria-expanded={!closed}
+                      >
+                        <ChevronRight size={18} className={cn("flex-none text-zinc-400 transition-transform", !closed && "rotate-90")} />
+                        <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-3 mb-6">
+                        <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{stripTags(node.label) || 'Untitled Node'}</h3>
+                      </div>
+                    )}
+                    {!closed && <NodeRenderer node={node} />}
                   </div>
-                ))}
+                  );
+                })}
             </>
           )}
         </div>
@@ -773,8 +801,20 @@ export default function App() {
                     )}
 
                     <div className="p-4 md:p-8">
-                      <div className="flex justify-between items-center md:items-start gap-2 mb-3 md:mb-6 max-md:-mr-2 max-md:-mt-1">
+                      <div className={cn(
+                        "flex justify-between items-center md:items-start gap-2 max-md:-mr-2 max-md:-mt-1",
+                        isNodeCollapsed(node) ? "mb-0" : "mb-3 md:mb-6"
+                      )}>
                         <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                          <button
+                            onClick={() => toggleNodeCollapsed(node.id)}
+                            className="flex-none p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title={isNodeCollapsed(node) ? "Expand section" : "Collapse section"}
+                            aria-label={isNodeCollapsed(node) ? "Expand section" : "Collapse section"}
+                            aria-expanded={!isNodeCollapsed(node)}
+                          >
+                            <ChevronRight size={18} className={cn("transition-transform", !isNodeCollapsed(node) && "rotate-90")} />
+                          </button>
                           <span className="flex-none px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-zinc-200/50 dark:border-zinc-700/50">{node.type}</span>
                           <h3 className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight max-md:truncate">{stripTags(node.label) || 'Untitled Node'}</h3>
                         </div>
@@ -815,6 +855,7 @@ export default function App() {
                         )}
                       </div>
 
+                      {!isNodeCollapsed(node) && (
                       <div className="relative max-md:overflow-x-auto">
                         <NodeRenderer node={node} />
                         {node.type === 'image' && !hasImageContent(node.info) ? (
@@ -832,6 +873,7 @@ export default function App() {
                           )
                         )}
                       </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
