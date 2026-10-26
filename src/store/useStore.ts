@@ -380,10 +380,14 @@ export const useStore = create<AppState>()(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, redirectUrl: window.location.href }),
           });
-          if (!response.ok) throw new Error('Failed to send magic link');
+          // Show the server's own reason (e.g. "invite-only") instead of a generic text.
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data?.success) {
+            throw new Error(data?.error || 'Failed to send magic link');
+          }
         } catch (e) {
           console.error(e);
-          set({ error: 'Failed to send magic link' });
+          set({ error: e instanceof Error ? e.message : 'Failed to send magic link' });
         } finally {
           set({ isLoading: false });
         }
