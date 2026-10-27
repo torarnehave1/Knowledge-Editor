@@ -866,10 +866,17 @@ export default function App() {
                           </div>
                         ) : (
                           viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && (
-                            <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400">
+                            // The whole empty box opens the section editor. Before 2026-10-27 it only
+                            // said "Click edit" and the edit icon appeared on hover alone, so an empty
+                            // section (e.g. a new html-node) looked impossible to edit.
+                            <button
+                              type="button"
+                              onClick={() => setEditingNodeId(node.id)}
+                              className="w-full py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                            >
                               <Plus size={24} className="mb-2 opacity-50" />
-                              <p className="text-sm font-medium">Click edit to add content</p>
-                            </div>
+                              <span className="text-sm font-medium">{node.type === 'html-node' ? 'Click to add HTML' : 'Click to add content'}</span>
+                            </button>
                           )
                         )}
                       </div>
