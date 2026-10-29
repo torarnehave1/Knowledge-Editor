@@ -216,7 +216,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
           <div className="mt-8 pt-8 border-t border-zinc-800/50">
             <div className="prose prose-invert prose-sm max-w-none opacity-60 group-hover:opacity-100 transition-opacity">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                {node.info}
+                {processContent(node.info, node.commentaries)}
               </ReactMarkdown>
             </div>
           </div>
@@ -263,32 +263,49 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     );
   }
 
-  if (node.type === 'youtube-video' && node.path) {
-    const videoId = getYouTubeId(node.path);
-    const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : (node.path.includes('embed') ? node.path : null);
-    
-    if (embedUrl) {
+  // Shared by the video nodes: their info gets the same macro processing ([SECTION], [FANCY],
+  // [COMMENTARY] …) as every other node. It used to go to ReactMarkdown raw, so a SECTION
+  // showed up as literal "[SECTION | …]" text under the video.
+  const renderInfo = () =>
+    node.info ? (
+      <div className="prose prose-slate max-w-none dark:prose-invert">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+          {processContent(node.info, node.commentaries)}
+        </ReactMarkdown>
+      </div>
+    ) : null;
+
+  if (node.type === 'youtube-video') {
+    // Where the video is, in the order nodes are written across VEGR.AI: path (registry,
+    // MCP), the ![YOUTUBE src=…] macro in the label (canonical frontend form, path null),
+    // then the source list. A node with path null used to show no player here at all.
+    const labelSrc = (node.label || '').match(/!\[YOUTUBE src=(.*?)\]/)?.[1] || '';
+    const biblSrc = (Array.isArray(node.bibl) ? node.bibl : []).find((u: string) => getYouTubeId(u)) || '';
+    const source = node.path || labelSrc || biblSrc;
+    const videoId = getYouTubeId(source);
+    const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : (source.includes('embed') ? source : null);
+    // The label macro is the player, not text: when the info also embeds the same video,
+    // skip the second player.
+    const infoHasPlayer = !!videoId && (node.info || '').includes(videoId) && /\[YOUTUBE src=/.test(node.info || '');
+
+    if (embedUrl && !infoHasPlayer) {
       return (
         <div className="space-y-4">
           <div className="w-full aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
             <iframe
               src={embedUrl}
-              title={node.label}
+              title={(node.label || '').replace(/!\[YOUTUBE src=.*?\](.*?)\[END YOUTUBE\]/, '$1')}
               className="w-full h-full border-none"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
           </div>
-          {node.info && (
-            <div className="prose prose-slate max-w-none dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                {node.info}
-              </ReactMarkdown>
-            </div>
-          )}
+          {renderInfo()}
         </div>
       );
     }
+    if (!node.info) return null;
+    return renderInfo();
   }
 
   if (node.type === 'realtime-video') {
@@ -314,18 +331,12 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
             <p className="text-xs">Edit this section and pick a recording, or paste an MP4 URL.</p>
           </div>
         )}
-        {node.info && (
-          <div className="prose prose-slate max-w-none dark:prose-invert">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-              {node.info}
-            </ReactMarkdown>
-          </div>
-        )}
+        {renderInfo()}
       </div>
     );
   }
 
-  if (!node.info && node.type !== 'youtube-video') return null;
+  if (!node.info) return null;
 
   if (node.type === 'mermaid-diagram') {
     return <MermaidDiagram code={node.info} />;
@@ -364,7 +375,8 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   // Handle ![Leftside-N|styles](url) / ![Rightside-N|styles](url) — parity
   // with vegvisr-frontend processLeftRightImages: the image sits beside the
   // next N non-empty lines (default 1) in a flex row; Rightside flips order.
-  const processSideImages = (text: string) => {
+  // A function declaration (hoisted), so the video branches above can use processContent.
+  function processSideImages(text: string) {
     const lines = text.split('\n');
     const out: string[] = [];
     let i = 0;
@@ -419,10 +431,12 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       i = j;
     }
     return out.join('\n');
-  };
+  }
 
   // Simple pre-processor for custom tags
-  const processContent = (content: string, commentaries?: any[]) => {
+  // Hoisted for the same reason: youtube-video and realtime-video info must get the same
+  // macro processing ([SECTION], [FANCY] …) as any other node, not raw markdown.
+  function processContent(content: string, commentaries?: any[]) {
     let processed = processSideImages(content);
 
     // Handle ![YOUTUBE src=...]title[END YOUTUBE]
@@ -655,7 +669,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     });
 
     return processed;
-  };
+  }
 
   const processedInfo = processContent(node.info, node.commentaries);
 
