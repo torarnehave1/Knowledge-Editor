@@ -79,6 +79,7 @@ const TYPE_LABELS: Record<string, string> = {
   'youtube-video': 'YouTube Video',
   'audio': 'Audio',
   'realtime-video': 'Realtime Video',
+  'cloudflare-video': 'Cloudflare Video',
   'audio-visualizer': 'Audio Visualizer',
   'REG': 'Registration',
   'html-node': 'HTML Section',

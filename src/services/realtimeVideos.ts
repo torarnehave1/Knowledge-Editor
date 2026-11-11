@@ -42,6 +42,50 @@ export const resolveRealtimeVideoUrl = (
   return `${REALTIME_VIDEO_BASE}/${encoded}`;
 };
 
+// cloudflare-video nodes — parity with vegvisr-frontend GNewCloudflareVideoNode.vue.
+// The node holds either a Cloudflare Stream video ID (32-char hex, in path,
+// metadata.videoId or an iframe/URL in info) or a direct MP4/WebM file in path.
+export const CLOUDFLARE_STREAM_SUBDOMAIN = 'customer-7tiaylt74yxtwkg8.cloudflarestream.com';
+
+const extractStreamVideoId = (raw?: string | null): string | null => {
+  const val = String(raw || '').trim();
+  if (!val) return null;
+  if (/^[a-f0-9]{32}$/.test(val)) return val;
+  const url = val.match(/src=["']([^"']+)["']/)?.[1] || val;
+  return (
+    url.match(/cloudflarestream\.com\/([a-f0-9]{32})/)?.[1] ||
+    url.match(/videodelivery\.net\/([a-f0-9]{32})/)?.[1] ||
+    null
+  );
+};
+
+export const resolveCloudflareVideo = (node: {
+  path?: string | null;
+  publicUrl?: string | null;
+  info?: string | null;
+  label?: string | null;
+  metadata?: { videoId?: string | null } | null;
+}): { kind: 'stream'; embedUrl: string } | { kind: 'file'; url: string } | null => {
+  const videoId =
+    extractStreamVideoId(node.path) ||
+    node.metadata?.videoId ||
+    extractStreamVideoId(node.info) ||
+    extractStreamVideoId(node.label);
+  if (videoId) {
+    return { kind: 'stream', embedUrl: `https://${CLOUDFLARE_STREAM_SUBDOMAIN}/${videoId}/iframe` };
+  }
+
+  const ready = String(node.publicUrl || '').trim();
+  if (/^https?:\/\//i.test(ready)) return { kind: 'file', url: ready };
+
+  const rawPath = String(node.path || '').trim();
+  if (/\.(mp4|webm|mov|m4v)($|[?#])/i.test(rawPath)) {
+    const url = resolveRealtimeVideoUrl(rawPath);
+    if (url) return { kind: 'file', url };
+  }
+  return null;
+};
+
 export const listRecordings = async (limit = 200): Promise<Recording[]> => {
   const res = await fetch(`${RECORDINGS_ENDPOINT}?prefix=recordings/&limit=${limit}`);
   if (!res.ok) throw new Error(`Failed to load videos: ${res.status}`);

@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Node } from '../types';
 import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film } from 'lucide-react';
-import { resolveRealtimeVideoUrl } from '../services/realtimeVideos';
+import { resolveRealtimeVideoUrl, resolveCloudflareVideo } from '../services/realtimeVideos';
 import { RegisteredTypeNode, useApprovedTypes } from '../lib/vegvisrNode';
 import { useStore } from '../store/useStore';
 
@@ -332,6 +332,46 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
           </div>
         )}
         {renderInfo()}
+      </div>
+    );
+  }
+
+  if (node.type === 'cloudflare-video') {
+    const video = resolveCloudflareVideo(node as any);
+    // Legacy nodes keep the Stream iframe in info; that is the player, not a description.
+    const infoIsEmbed = /^\s*<iframe/i.test(node.info || '') || (node.info || '').includes('cloudflarestream.com');
+
+    return (
+      <div className="space-y-4">
+        {video?.kind === 'stream' ? (
+          <div className="w-full aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
+            <iframe
+              src={video.embedUrl}
+              title={node.label}
+              className="w-full h-full border-none"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : video?.kind === 'file' ? (
+          <div className="w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
+            <video
+              src={video.url}
+              title={node.label}
+              className="block w-full max-h-[70vh] bg-black"
+              controls
+              preload="metadata"
+              playsInline
+            />
+          </div>
+        ) : (
+          <div className="w-full py-12 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center text-zinc-400 gap-2">
+            <Film size={24} className="opacity-50" />
+            <p className="text-sm font-medium">No Cloudflare video configured</p>
+            <p className="text-xs">Set the path to a Cloudflare Stream video ID or an MP4 URL.</p>
+          </div>
+        )}
+        {!infoIsEmbed && renderInfo()}
       </div>
     );
   }
