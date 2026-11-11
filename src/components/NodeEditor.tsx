@@ -79,6 +79,7 @@ const TYPE_LABELS: Record<string, string> = {
   'youtube-video': 'YouTube Video',
   'audio': 'Audio',
   'realtime-video': 'Realtime Video',
+  'album-video': 'Album Video',
   'cloudflare-video': 'Cloudflare Video',
   'audio-visualizer': 'Audio Visualizer',
   'REG': 'Registration',
@@ -591,6 +592,26 @@ export default function NodeEditor() {
               className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
             <p className="text-[10px] text-zinc-500">Paste the full audio file URL here (mp3, wav, etc.)</p>
+          </div>
+        )}
+
+        {editedNode.type === 'album-video' && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Album Video URL</label>
+            <input
+              type="text"
+              name="path"
+              value={editedNode.path || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditedNode(prev => prev ? ({ ...prev, path: val }) : null);
+              }}
+              placeholder="https://vegvisr.imgix.net/1234567890-1.mp4"
+              className="w-full p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <p className="text-[10px] text-zinc-500">
+              The full URL of a video in a Photos album (mp4, m4v, webm or mov). Anyone who can see this graph can play it, also when the album is private.
+            </p>
           </div>
         )}
 

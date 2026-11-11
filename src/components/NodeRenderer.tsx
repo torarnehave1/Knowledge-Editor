@@ -73,6 +73,51 @@ function MermaidDiagram({ code }: { code: string }) {
   );
 }
 
+// album-video: a video file from a Photos album. `path` is the full public URL the album list
+// returns — never rebuilt from a key, because a World with its own storage serves from another host.
+function AlbumVideo({ node, renderInfo }: { node: Node; renderInfo: () => React.ReactNode }) {
+  const raw = String(node.path || '').trim();
+  const videoUrl = /^https?:\/\//i.test(raw) ? raw : null;
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [videoUrl]);
+
+  return (
+    <div className="space-y-4">
+      {videoUrl ? (
+        <div className="w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-black">
+          <video
+            key={videoUrl}
+            src={videoUrl}
+            title={node.label}
+            className="block w-full max-h-[70vh] bg-black"
+            controls
+            preload="metadata"
+            playsInline
+            onError={() => setFailed(true)}
+            onLoadedMetadata={() => setFailed(false)}
+          />
+          {failed && (
+            <p className="px-4 py-3 text-sm bg-amber-50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+              This video cannot be played in this browser. iPhone .mov files often only play in Safari —{' '}
+              <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="underline">open the file directly</a>.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="w-full py-12 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center text-zinc-400 gap-2">
+          <Film size={24} className="opacity-50" />
+          <p className="text-sm font-medium">No album video selected</p>
+          <p className="text-xs">Edit this section and paste the URL of a video from a Photos album.</p>
+        </div>
+      )}
+      {renderInfo()}
+    </div>
+  );
+}
+
 export default function NodeRenderer({ node }: NodeRendererProps) {
   // Types with an approved renderer in graph_system_registry (the rendering engine). Called before
   // any early return, as hooks must be.
@@ -306,6 +351,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     }
     if (!node.info) return null;
     return renderInfo();
+  }
+
+  if (node.type === 'album-video') {
+    return <AlbumVideo node={node} renderInfo={renderInfo} />;
   }
 
   if (node.type === 'realtime-video') {

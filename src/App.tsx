@@ -13,7 +13,7 @@ import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
-const MEDIA_NODE_TYPES = ['realtime-video', 'cloudflare-video', 'youtube-video', 'audio', 'audio-visualizer'];
+const MEDIA_NODE_TYPES = ['realtime-video', 'album-video', 'cloudflare-video', 'youtube-video', 'audio', 'audio-visualizer'];
 
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';
