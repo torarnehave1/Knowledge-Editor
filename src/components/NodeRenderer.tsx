@@ -7,9 +7,34 @@ import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film } fr
 import { resolveRealtimeVideoUrl, resolveCloudflareVideo } from '../services/realtimeVideos';
 import { RegisteredTypeNode, useApprovedTypes } from '../lib/vegvisrNode';
 import { useStore } from '../store/useStore';
+import { useBrand } from '../branding';
+import ImageCreditModal, { ImageAttribution } from './ImageCreditModal';
 
 interface NodeRendererProps {
   node: Node;
+  // Editor (not /view): each image gets a button to set its photo credit.
+  editable?: boolean;
+}
+
+const escapeAttr = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// Caption for an image's credit, as HTML (images built as HTML strings) — "Foto: Navn – tekst".
+function creditHtml(a: any, lang: 'no' | 'en'): string {
+  if (!a || !a.requires_attribution) return '';
+  const name = a.photographer ? escapeAttr(String(a.photographer)) : '';
+  const url = a.photographer_url && /^https?:\/\//i.test(a.photographer_url) ? escapeAttr(a.photographer_url) : '';
+  const extra = a.custom_attribution ? escapeAttr(String(a.custom_attribution)) : '';
+  if (!name && !extra) return '';
+  const who = name ? (url ? `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">${name}</a>` : name) : '';
+  const parts = [who ? `${lang === 'no' ? 'Foto' : 'Photo'}: ${who}` : '', extra].filter(Boolean).join(' – ');
+  // span, not div: a markdown image sits inside a <p>.
+  return `<span class="image-credit" style="display: block; font-size: 0.8em; color: #71717a; margin-top: 6px; line-height: 1.4;">${parts}</span>`;
+}
+
+function creditButtonHtml(url: string, has: boolean, lang: 'no' | 'en'): string {
+  const label = lang === 'no' ? (has ? 'Endre kreditering' : 'Krediter fotograf') : (has ? 'Edit credit' : 'Credit photographer');
+  return `<button type="button" data-credit-url="${escapeAttr(url)}" style="margin-top: 6px; font-size: 0.75em; padding: 3px 10px; border-radius: 999px; border: 1px solid #d4d4d8; background: #fff; color: #3f3f46; cursor: pointer;">✎ ${label}</button>`;
 }
 
 // Mermaid is loaded on demand (separate chunk) the first time a
@@ -118,11 +143,33 @@ function AlbumVideo({ node, renderInfo }: { node: Node; renderInfo: () => React.
   );
 }
 
-export default function NodeRenderer({ node }: NodeRendererProps) {
+export default function NodeRenderer({ node, editable = false }: NodeRendererProps) {
   // Types with an approved renderer in graph_system_registry (the rendering engine). Called before
   // any early return, as hooks must be.
   // With the open graph's World, that World's own types too (phase 2).
   const world = useStore((s) => s.graphWorld);
+  const saveNode = useStore((s) => s.saveNode);
+  const lang = useBrand().lang;
+  const [creditUrl, setCreditUrl] = useState<string | null>(null);
+  const attributions = node.imageAttributions || {};
+  // Caption + (in the editor) credit button under an image built as an HTML string.
+  const creditBlock = (url: string) =>
+    creditHtml(attributions[url], lang) + (editable ? creditButtonHtml(url, !!attributions[url], lang) : '');
+  // One click handler for the whole node: the buttons live in HTML strings and are rebuilt on
+  // every render, so per-button listeners would be lost (the vegvisr.org bug, 2026-11-06).
+  const onCreditClick = (e: React.MouseEvent) => {
+    const btn = (e.target as HTMLElement).closest('[data-credit-url]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCreditUrl(btn.getAttribute('data-credit-url'));
+  };
+  const writeCredit = (url: string, a: ImageAttribution | null) => {
+    const next = { ...attributions };
+    if (a) next[url] = a; else delete next[url];
+    saveNode({ ...node, imageAttributions: next });
+    setCreditUrl(null);
+  };
   const approvedTypes = useApprovedTypes(world);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -508,7 +555,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       const contentOrder = type === 'Rightside' ? ' order: 1;' : '';
       out.push(
         '',
-        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${imgWidth}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" /></div><div style="${contentFlex}${contentOrder}">`,
+        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${imgWidth}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" />${creditBlock(url)}</div><div style="${contentFlex}${contentOrder}">`,
         '',
         ...paras,
         '',
@@ -708,7 +755,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       if (/^\d+$/.test(height)) height += 'px';
       const objectFit = getStyle('object-fit', 'cover');
       const objectPosition = getStyle('object-position', 'center');
-      return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" /></div>\n\n`;
+      return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" />${creditBlock(url.trim())}</div>\n\n`;
     });
 
     // Handle [SECTION | background-color:'...'; color:'...'; text-align:'...'; ...]...[END SECTION]
@@ -771,9 +818,30 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     }
   }
 
+  // A markdown image with its credit caption and (editor) button underneath.
+  const WithCredit = ({ src, children }: { src?: string; children: React.ReactNode }) => {
+    const block = src ? creditBlock(src) : '';
+    if (!block) return <>{children}</>;
+    return (
+      <span style={{ display: 'block' }}>
+        {children}
+        <span style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: block }} />
+      </span>
+    );
+  };
+
   return (
-    <div className="prose prose-slate max-w-none dark:prose-invert">
-      <ReactMarkdown 
+    <div className="prose prose-slate max-w-none dark:prose-invert" onClickCapture={editable ? onCreditClick : undefined}>
+      {creditUrl && (
+        <ImageCreditModal
+          imageUrl={creditUrl}
+          current={(attributions[creditUrl] as ImageAttribution) || null}
+          onSave={(a) => writeCredit(creditUrl, a)}
+          onRemove={() => writeCredit(creditUrl, null)}
+          onClose={() => setCreditUrl(null)}
+        />
+      )}
+      <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
@@ -790,10 +858,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
                   styleObj[camelKey] = value;
                 }
               });
-              return <img {...props} alt={label} style={styleObj} className="rounded-xl shadow-sm" />;
+              return <WithCredit src={props.src}><img {...props} alt={label} style={styleObj} className="rounded-xl shadow-sm" /></WithCredit>;
             }
-            
-            return <img {...props} className="rounded-xl shadow-sm" />;
+
+            return <WithCredit src={props.src}><img {...props} className="rounded-xl shadow-sm" /></WithCredit>;
           }
         }}
       >

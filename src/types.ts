@@ -36,6 +36,9 @@ export interface Node {
   // Machine data owned by other tools (work contexts, course lessons, registry
   // schema …). The editor shows it read-only and must save it back untouched.
   metadata?: Record<string, any>;
+  // Photo credit per image URL in this node: { provider, photographer, photographer_url,
+  // custom_attribution, requires_attribution }. Same field vegvisr-frontend reads and writes.
+  imageAttributions?: Record<string, any>;
 }
 
 export interface GraphMetadata {

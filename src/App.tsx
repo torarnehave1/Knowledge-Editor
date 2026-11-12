@@ -857,7 +857,7 @@ export default function App() {
 
                       {!isNodeCollapsed(node) && (
                       <div className="relative max-md:overflow-x-auto">
-                        <NodeRenderer node={node} />
+                        <NodeRenderer node={node} editable={viewMode === 'edit'} />
                         {node.type === 'image' && !hasImageContent(node.info) ? (
                           <div className="py-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-400 gap-1">
                             <ImageOff size={24} className="mb-1 opacity-50" />
