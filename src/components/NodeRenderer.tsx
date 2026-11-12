@@ -152,7 +152,8 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
   const lang = useBrand().lang;
   const [creditUrl, setCreditUrl] = useState<string | null>(null);
   const attributions = node.imageAttributions || {};
-  // Caption + (in the editor) credit button under an image built as an HTML string.
+  // Caption + (in the editor) credit button under an image. Applied in the markdown img component,
+  // which also receives the <img> of HTML-built images (header, side images) via rehype-raw.
   const creditBlock = (url: string) =>
     creditHtml(attributions[url], lang) + (editable ? creditButtonHtml(url, !!attributions[url], lang) : '');
   // One click handler for the whole node: the buttons live in HTML strings and are rebuilt on
@@ -555,7 +556,7 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
       const contentOrder = type === 'Rightside' ? ' order: 1;' : '';
       out.push(
         '',
-        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${imgWidth}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" />${creditBlock(url)}</div><div style="${contentFlex}${contentOrder}">`,
+        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${imgWidth}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" /></div><div style="${contentFlex}${contentOrder}">`,
         '',
         ...paras,
         '',
@@ -755,7 +756,7 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
       if (/^\d+$/.test(height)) height += 'px';
       const objectFit = getStyle('object-fit', 'cover');
       const objectPosition = getStyle('object-position', 'center');
-      return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" />${creditBlock(url.trim())}</div>\n\n`;
+      return `\n\n<div style="width: 100%; max-width: 100%; margin: 0 auto 20px; overflow: hidden;"><img src="${url.trim()}" alt="Header Image" style="width: 100%; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; display: block; border-radius: 8px; margin: 0;" /></div>\n\n`;
     });
 
     // Handle [SECTION | background-color:'...'; color:'...'; text-align:'...'; ...]...[END SECTION]
