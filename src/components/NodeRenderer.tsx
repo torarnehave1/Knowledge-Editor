@@ -496,21 +496,19 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       const objectFit = getStyle('object-fit', 'cover');
       const objectPosition = getStyle('object-position', 'center');
 
-      let imageFlex = 'flex: 0 0 20%; width: 20%; min-width: 20%;';
-      let contentFlex = 'flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;';
-      if (width.endsWith('px')) {
-        const wv = parseInt(width, 10);
-        if (wv > 200) {
-          const pct = Math.min((wv / 1000) * 100, 60);
-          imageFlex = `flex: 0 0 ${pct}%; width: ${pct}%; min-width: ${pct}%;`;
-          contentFlex = `flex: 1 1 auto; max-width: ${100 - pct - 2}%; min-width: 0; overflow-wrap: break-word;`;
-        }
-      }
+      // The image column takes the image's own width; the text column starts from a
+      // fixed basis and grows. With `flex: 1 1 auto` the text's basis was its full
+      // one-line width, so in this wrapping row it always dropped below the image.
+      // Now the text sits beside the image, and drops below only on narrow screens.
+      const isPercentWidth = width.endsWith('%');
+      const imageFlex = isPercentWidth ? `flex: 0 0 ${width}; max-width: 100%;` : 'flex: 0 0 auto; max-width: 100%;';
+      const imgWidth = isPercentWidth ? '100%' : width;
+      const contentFlex = 'flex: 1 1 240px; min-width: 0; overflow-wrap: break-word;';
       const imgOrder = type === 'Rightside' ? ' order: 2;' : '';
       const contentOrder = type === 'Rightside' ? ' order: 1;' : '';
       out.push(
         '',
-        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${width}; min-width: ${width}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" /></div><div style="${contentFlex}${contentOrder}">`,
+        `<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; width: 100%; margin: 16px 0;"><div style="${imageFlex}${imgOrder}"><img src="${url}" alt="${type} Image" style="width: ${imgWidth}; max-width: 100%; height: ${height}; object-fit: ${objectFit}; object-position: ${objectPosition}; border-radius: 8px; margin: 0;" /></div><div style="${contentFlex}${contentOrder}">`,
         '',
         ...paras,
         '',
