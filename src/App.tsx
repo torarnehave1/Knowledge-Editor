@@ -4,7 +4,7 @@ import { Edit2, Trash2, MoreHorizontal, ChevronUp, ChevronDown, ChevronRight, Ey
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { Node, NodeType, User } from './types';
+import { Node, NodeType, User, GraphListItem } from './types';
 import { VALID_NODE_TYPES } from './constants';
 import { ScreenRecorder } from 'vegvisr-ui-kit';
 import Sidebar from './components/Sidebar';
@@ -31,6 +31,16 @@ import { LogOut } from 'lucide-react';
 // means the content references one — an empty one is a blank card otherwise.
 const hasImageContent = (info?: string | null) =>
   !!info && (/!\[[^\]]*\]\([^)]+\)/.test(info) || /<img[^>]+src=["'][^"']+["']/i.test(info));
+
+// A graph card's node types as [type, count] pairs. getknowgraphsummaries and searchGraphs send
+// a list of type names with no counts (count null, shown as the name alone); a map of
+// type -> count shows the count. Before 2026-11-13 the list was read as a map, so the
+// area-filtered portfolio showed "0: fulltext", "1: image".
+const nodeTypeEntries = (types: GraphListItem['nodeTypes']): Array<[string, number | null]> => {
+  if (!types) return [];
+  if (Array.isArray(types)) return types.filter(Boolean).map((t) => [String(t), null]);
+  return Object.entries(types);
+};
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -711,9 +721,9 @@ export default function App() {
                         )}
 
                         {/* Node Types Summary */}
-                        {graph.nodeTypes && Object.keys(graph.nodeTypes).length > 0 && (
+                        {nodeTypeEntries(graph.nodeTypes).length > 0 && (
                           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800 w-full">
-                            {Object.entries(graph.nodeTypes).map(([type, count]) => (
+                            {nodeTypeEntries(graph.nodeTypes).map(([type, count]) => (
                               <div key={type} className="flex items-center gap-1">
                                 <span className={cn(
                                   "w-1.5 h-1.5 rounded-full",
@@ -723,7 +733,7 @@ export default function App() {
                                   type === 'image' ? "bg-emerald-500" : "bg-zinc-400"
                                 )} />
                                 <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 capitalize">
-                                  {type}: <span className="font-bold text-zinc-700 dark:text-zinc-300">{count}</span>
+                                  {type}{count !== null && <>: <span className="font-bold text-zinc-700 dark:text-zinc-300">{count}</span></>}
                                 </span>
                               </div>
                             ))}
