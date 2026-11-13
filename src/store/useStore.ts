@@ -248,7 +248,9 @@ interface AppState {
   fetchTrash: () => Promise<void>;
   fetchVersionHistory: () => Promise<void>;
   loadGraph: (id: string) => Promise<void>;
-  saveGraph: (id?: string) => Promise<void>;
+  /** Resolves true when the graph was saved, false when it was not (the reason is in `error`). */
+  saveGraph: (id?: string) => Promise<boolean>;
+  noteSavedVersion: (id: string, version: unknown) => void;
   createNewGraph: () => Promise<void>;
   deleteGraph: () => Promise<void>;
   restoreGraph: (trashId: string) => Promise<void>;
@@ -283,6 +285,18 @@ interface AppState {
 
 // Bumped by every fetchGraphs call; see the check there.
 let graphListFetchSeq = 0;
+
+// Saves run one at a time, in the order they were asked for. Many edits fire a save without
+// waiting for it, and each save needs the version the previous one produced.
+let saveQueue: Promise<unknown> = Promise.resolve();
+
+// A save sends the WHOLE graph as this tab holds it. Until 2026-11-13 it was sent with
+// override, so a tab that had been open for a while wrote its old copy over whatever had been
+// changed elsewhere in the meantime: a node added through the MCP server at 12:29 was erased by
+// a Publish at 12:54 from a tab loaded at 09:01 (NIBI Nyhetsbrev – Utgave 2, version 49).
+const SAVE_CONFLICT_MESSAGE =
+  'Not saved: this graph was changed somewhere else after you opened it. ' +
+  'Copy any text you have changed here, then reload the page to get the latest version.';
 
 export const useStore = create<AppState>()(
   persist(
@@ -609,12 +623,13 @@ export const useStore = create<AppState>()(
                     const versionData = await knowledgeService.getGraphVersion(id, h.version);
                     // Basic validation: must have nodes array
                     if (versionData && Array.isArray(versionData.nodes)) {
-                      await knowledgeService.saveGraph(id, versionData, true);
+                      const repaired = await knowledgeService.saveGraph(id, versionData, true);
                       set({ 
                         doc: versionData, 
                         viewMode: 'edit', 
                         error: `Graph successfully recovered from version ${h.version}.` 
                       });
+                      get().noteSavedVersion(id, repaired?.newVersion);
                       setTimeout(() => set({ error: null }), 5000);
                       repairSuccess = true;
                       break;
@@ -654,16 +669,52 @@ export const useStore = create<AppState>()(
           return get().saveGraph(newId);
         }
 
-        set({ saveStatus: 'saving' });
-        try {
-          await knowledgeService.saveGraph(targetId, get().doc, true);
-          set({ saveStatus: 'success' });
-          setTimeout(() => set({ saveStatus: 'idle' }), 3000);
-        } catch (e) {
-          console.error(e);
-          set({ saveStatus: 'error' });
-          setTimeout(() => set({ saveStatus: 'idle' }), 3000);
-        }
+        const run = async (): Promise<boolean> => {
+          set({ saveStatus: 'saving' });
+          // Read when this save's turn comes, so it carries the version the one before it got.
+          const doc = get().doc;
+          try {
+            let saved;
+            try {
+              // No override: the server refuses the save when the graph has moved on.
+              saved = await knowledgeService.saveGraph(targetId, doc, false);
+            } catch (e) {
+              if (!(e instanceof Error) || e.message !== 'VERSION_MISMATCH') throw e;
+              // A refusal is not yet proof that somebody else changed the graph: for some older
+              // graphs the server's version counter and the number in the graph differ. So look
+              // at the graph as it is now. Same version as the one this tab loaded = untouched,
+              // and the save goes through; anything else is a real conflict and nothing is written.
+              const latest = await knowledgeService.getGraph(targetId);
+              if ((latest.metadata?.version ?? 0) !== (doc.metadata?.version ?? 0)) {
+                set({ saveStatus: 'error', error: SAVE_CONFLICT_MESSAGE });
+                setTimeout(() => set({ saveStatus: 'idle' }), 3000);
+                return false;
+              }
+              saved = await knowledgeService.saveGraph(targetId, doc, true);
+            }
+            get().noteSavedVersion(targetId, saved?.newVersion);
+            set({ saveStatus: 'success' });
+            setTimeout(() => set({ saveStatus: 'idle' }), 3000);
+            return true;
+          } catch (e) {
+            console.error(e);
+            set({ saveStatus: 'error' });
+            setTimeout(() => set({ saveStatus: 'idle' }), 3000);
+            return false;
+          }
+        };
+        const result = saveQueue.then(run, run);
+        saveQueue = result.catch(() => undefined);
+        return result;
+      },
+
+      // The version a save produced becomes the version this tab holds. Only the number is
+      // touched: edits made while the save was on its way stay as they are.
+      noteSavedVersion: (id, version) => {
+        if (typeof version !== 'number') return;
+        set((state) => state.currentGraphId !== id ? state : {
+          doc: { ...state.doc, metadata: { ...state.doc.metadata, version } as any }
+        });
       },
 
       createNewGraph: async () => {
@@ -748,8 +799,10 @@ export const useStore = create<AppState>()(
         set({ isLoading: true, error: null });
         try {
           const versionData = await knowledgeService.getGraphVersion(id, version);
-          await knowledgeService.saveGraph(id, versionData, true);
+          // Restoring is a deliberate overwrite, so this one keeps override.
+          const restored = await knowledgeService.saveGraph(id, versionData, true);
           set({ doc: versionData, isVersionHistoryModalOpen: false });
+          get().noteSavedVersion(id, restored?.newVersion);
           set({ saveStatus: 'success' });
           setTimeout(() => set({ saveStatus: 'idle' }), 3000);
         } catch (e) {
@@ -843,13 +896,15 @@ export const useStore = create<AppState>()(
           };
           
           // 4. Save and Switch
-          await knowledgeService.saveGraph(newId, newDoc, true);
+          const translated = await knowledgeService.saveGraph(newId, newDoc, true);
           set({ 
             doc: newDoc, 
             currentGraphId: newId, 
             translationStatus: 'success',
             viewMode: 'edit'
           });
+          // newDoc carries the source graph's version number; the new graph starts at its own.
+          get().noteSavedVersion(newId, translated?.newVersion);
           
           // Refresh list
           get().fetchGraphs();
@@ -992,7 +1047,9 @@ export const useStore = create<AppState>()(
             }
           }));
 
-          await get().saveGraph();
+          if (!(await get().saveGraph())) {
+            throw new Error(get().error || 'The graph could not be saved');
+          }
 
           set({ seoStatus: 'success', seoUrl: genResult.url });
         } catch (e: any) {
@@ -1026,7 +1083,19 @@ export const useStore = create<AppState>()(
           }
         }));
 
-        await get().saveGraph();
+        if (!(await get().saveGraph())) {
+          // Not saved, so the graph is not published (or unpublished) either: show what is true.
+          set((state) => ({
+            doc: {
+              ...state.doc,
+              metadata: {
+                ...state.doc.metadata,
+                publicationState: doc.metadata?.publicationState,
+                publishedAt: doc.metadata?.publishedAt
+              }
+            }
+          }));
+        }
       },
 
       fetchAvailableModels: async () => {
