@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar';
 import { MobileHeader, MobileBottomNav, Sheet, SheetAction } from './components/MobileChrome';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
+import FrontPageView from './components/FrontPageView';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
 const MEDIA_NODE_TYPES = ['realtime-video', 'album-video', 'cloudflare-video', 'youtube-video', 'audio', 'audio-visualizer'];
@@ -238,6 +239,21 @@ export default function App() {
   // /view of a password-protected graph shows the password form until it is unlocked.
   const [passwordUnlocked, setPasswordUnlocked] = useState(() => !!graphId && hasGraphPasswordSession(graphId));
   const viewLocked = isViewMode && !passwordUnlocked && isGraphPasswordProtected(doc.metadata);
+
+  // /view?graphId=…&layout=forside shows the graph as a front page (FrontPageView). Only once the
+  // graph is loaded and unlocked — sign-in, loading, error and password states stay as below.
+  const layoutParam = (params.get('layout') || '').toLowerCase();
+  const frontPageReady =
+    isViewMode &&
+    (layoutParam === 'forside' || layoutParam === 'frontpage') &&
+    !(viewNeedsLogin && !localStorage.getItem('emailVerificationToken')) &&
+    !isLoading &&
+    currentGraphId === graphId &&
+    !error &&
+    !viewLocked;
+  if (frontPageReady) {
+    return <FrontPageView metadata={doc.metadata} nodes={doc.nodes.filter((node) => node.visible)} />;
+  }
 
   if (isViewMode) {
     return (
