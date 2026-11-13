@@ -89,11 +89,24 @@ function splitStories(info: string): { pre: string; stories: Array<{ title: stri
 }
 
 function findPlan(nodes: Node[]): Plan | null {
+  const isObj = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
+  // 1. A newsletter graph (graph type "Nyhetsbrevgraf", registered 2026-11-13): its header
+  //    node, type nyhetsbrev, carries the plan in metadata.forside. The masthead comes from
+  //    the header's own fields unless the plan sets one. Same rule as graph-portfolio.js.
+  const header = nodes.find(node => node.type === 'nyhetsbrev');
+  if (header) {
+    const m = header.metadata;
+    if (!isObj(m) || !isObj(m.forside)) return null; // a newsletter without a front page
+    const plan = { ...m.forside } as Plan;
+    if (!isObj(plan.masthead)) plan.masthead = { title: m.navn, left: m.utgiver, right: m.utgave };
+    return plan;
+  }
+  // 2. Before the graph type existed: a json-node whose info is JSON with a "frontpage" key.
   for (const node of nodes) {
     if (node.type !== 'json-node' || !node.info) continue;
     try {
       const parsed = JSON.parse(node.info);
-      if (parsed && typeof parsed.frontpage === 'object' && parsed.frontpage) return parsed.frontpage as Plan;
+      if (parsed && isObj(parsed.frontpage)) return parsed.frontpage as Plan;
     } catch {
       // not JSON, so not a plan
     }
@@ -114,6 +127,8 @@ function readGraph(nodes: Node[]) {
 
   for (const node of nodes) {
     if (!node.visible) continue;
+    // The newsletter's header node is read by findPlan; it is not something to show.
+    if (node.type === 'nyhetsbrev') continue;
     if (node.type !== 'fulltext') {
       pieces.push({ kind: 'panel', key: `panel-${node.id}`, node });
       continue;
