@@ -56,7 +56,9 @@ export const knowledgeService = {
     return (nodes || []) as Node[];
   },
 
-  async listGraphs(metaArea?: string): Promise<GraphListItem[]> {
+  // onFirstPage: called with the newest 250 graphs as soon as they arrive, so the portfolio
+  // can show them while the remaining pages load (all-graphs list only).
+  async listGraphs(metaArea?: string, onFirstPage?: (list: GraphListItem[]) => void): Promise<GraphListItem[]> {
     const headers = { 'X-API-Token': getApiToken() };
 
     // A specific area: the summaries endpoint filters by it (one page of up to 250, as before).
@@ -78,7 +80,17 @@ export const knowledgeService = {
       if (!response.ok) throw new Error('Failed to list graphs');
       return response.json();
     };
+    const toItems = (page: any, seen: Set<string>): GraphListItem[] => {
+      const out: GraphListItem[] = [];
+      for (const r of page.results || []) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push({ id: r.id, title: r.title, updatedAt: r.updatedAt, thumbnail: r.thumbnail ?? null });
+      }
+      return out;
+    };
     const first = await fetchPage(0);
+    if (onFirstPage && first.hasMore) onFirstPage(toItems(first, new Set()));
     const pages = [first];
     const total = Number(first.total || 0);
     if (first.hasMore && total > PAGE) {
@@ -87,15 +99,7 @@ export const knowledgeService = {
       pages.push(...(await Promise.all(offsets.map(fetchPage))));
     }
     const seen = new Set<string>();
-    const list: GraphListItem[] = [];
-    for (const page of pages) {
-      for (const r of page.results || []) {
-        if (!r?.id || seen.has(r.id)) continue;
-        seen.add(r.id);
-        list.push({ id: r.id, title: r.title, updatedAt: r.updatedAt, thumbnail: r.thumbnail ?? null });
-      }
-    }
-    return list;
+    return pages.flatMap((page) => toItems(page, seen));
   },
 
   async searchGraphs(query: string, nodeType?: string): Promise<GraphListItem[]> {

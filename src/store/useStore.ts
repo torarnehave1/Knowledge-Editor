@@ -281,6 +281,9 @@ interface AppState {
   updateMetadata: (data: Partial<KnowledgeDocument['metadata']>) => void;
 }
 
+// Bumped by every fetchGraphs call; see the check there.
+let graphListFetchSeq = 0;
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -512,6 +515,8 @@ export const useStore = create<AppState>()(
 
       fetchGraphs: async () => {
         set({ isLoading: true });
+        // A newer fetch (filter or search changed) wins: an older one's results are dropped.
+        const seq = ++graphListFetchSeq;
         try {
           const { searchQuery, selectedMetaArea, selectedNodeType } = get();
           let list: GraphListItem[] = [];
@@ -520,8 +525,11 @@ export const useStore = create<AppState>()(
           if (searchQuery.trim() || (selectedNodeType && selectedNodeType !== 'All')) {
             list = await knowledgeService.searchGraphs(searchQuery, selectedNodeType);
           } else {
-            list = await knowledgeService.listGraphs(selectedMetaArea);
+            list = await knowledgeService.listGraphs(selectedMetaArea, (firstPage) => {
+              if (seq === graphListFetchSeq) set({ graphList: firstPage, isLoading: false });
+            });
           }
+          if (seq !== graphListFetchSeq) return;
           set({ graphList: list });
           
           try {
@@ -534,7 +542,7 @@ export const useStore = create<AppState>()(
           console.error('Failed to fetch graphs:', e);
           set({ error: 'Failed to fetch graphs' });
         } finally {
-          set({ isLoading: false });
+          if (seq === graphListFetchSeq) set({ isLoading: false });
         }
       },
 
