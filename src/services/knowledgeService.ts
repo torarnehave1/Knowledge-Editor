@@ -2,6 +2,7 @@
 import { KnowledgeDocument, Node, GraphListItem } from '../types';
 import { worldDomain } from '../branding';
 import { sortNodesByOrder } from '../utils/nodeOrder';
+import { findGraphImage } from '../lib/graphImage';
 
 const API_BASE_URL = 'https://knowledge.vegvisr.org';
 const nodeTypesPromises = new Map<string, Promise<string[]>>(); // world ('' = platform) -> types
@@ -71,6 +72,21 @@ export const knowledgeService = {
     if (!response.ok) throw new Error('Failed to list graphs');
     const data = await response.json();
     return data.results || [];
+  },
+
+  // Thumbnail for the graph portfolio card. The list endpoints (getknowgraphs,
+  // getknowgraphsummaries, searchGraphs) carry no image field, so the graph itself is read
+  // and its picture chosen the same way the SEO card does: seoOgImage first, then the first
+  // image found in the nodes. '' when the graph has none.
+  async getGraphThumbnail(id: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${encodeURIComponent(id)}`, {
+      headers: { 'X-API-Token': getApiToken() }
+    });
+    if (!response.ok) return '';
+    const data = await response.json().catch(() => null);
+    if (!data) return '';
+    const nodes: Node[] = Array.isArray(data.nodes) ? data.nodes : [];
+    return data.metadata?.seoOgImage || findGraphImage(nodes);
   },
 
   async searchGraphs(query: string, nodeType?: string): Promise<GraphListItem[]> {

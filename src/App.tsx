@@ -24,6 +24,7 @@ import { AgentChat } from './components/AgentChat';
 import { Login } from './components/Login';
 import { ViewPasswordGate, isGraphPasswordProtected, hasGraphPasswordSession } from './components/ViewPasswordGate';
 import { useStore } from './store/useStore';
+import { GraphThumbnail } from './components/GraphThumbnail';
 import { LogOut } from 'lucide-react';
 
 // An Image section carries its picture as markdown in `info`, so "has an image"
@@ -656,6 +657,10 @@ export default function App() {
                             : "border-zinc-200 dark:border-zinc-800 hover:border-indigo-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                         )}
                       >
+                        <GraphThumbnail
+                          graphId={graph.id}
+                          currentDoc={currentGraphId === graph.id ? doc : null}
+                        />
                         <div className="flex justify-between w-full items-center md:items-start gap-2 mb-1">
                           <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest truncate min-w-0">{graph.id}</span>
                           <div className="flex items-center gap-1 md:gap-2 flex-none">
