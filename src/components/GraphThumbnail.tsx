@@ -42,23 +42,29 @@ function sized(url: string): string {
 
 interface Props {
   graphId: string;
+  // The list's own thumbnail (getknowgraphsummaries): a string or null means known, so no fetch.
+  // undefined (searchGraphs results) means unknown, and the graph is read when the card shows.
+  thumbnail?: string | null;
   // The graph open in the editor: its picture comes from the in-memory document, so an image
   // added this session shows without a reload.
   currentDoc?: KnowledgeDocument | null;
 }
 
-export function GraphThumbnail({ graphId, currentDoc }: Props) {
+export function GraphThumbnail({ graphId, thumbnail, currentDoc }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [fetched, setFetched] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const known = thumbnail !== undefined;
   const local = currentDoc
     ? currentDoc.metadata?.seoOgImage || findGraphImage(currentDoc.nodes || [])
-    : null;
+    : known
+      ? thumbnail || ''
+      : null;
 
   useEffect(() => {
-    if (currentDoc || visible || !ref.current) return;
+    if (local !== null || visible || !ref.current) return;
     const el = ref.current;
     const io = new IntersectionObserver(
       entries => {
@@ -71,10 +77,10 @@ export function GraphThumbnail({ graphId, currentDoc }: Props) {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [currentDoc, visible]);
+  }, [local, visible]);
 
   useEffect(() => {
-    if (!visible || currentDoc) return;
+    if (!visible || local !== null) return;
     let alive = true;
     loadThumbnail(graphId).then(url => {
       if (alive) setFetched(url);
@@ -82,7 +88,7 @@ export function GraphThumbnail({ graphId, currentDoc }: Props) {
     return () => {
       alive = false;
     };
-  }, [visible, graphId, currentDoc]);
+  }, [visible, graphId, local]);
 
   const url = local ?? fetched;
   const loading = url === null;

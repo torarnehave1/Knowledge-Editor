@@ -659,6 +659,7 @@ export default function App() {
                       >
                         <GraphThumbnail
                           graphId={graph.id}
+                          thumbnail={graph.thumbnail}
                           currentDoc={currentGraphId === graph.id ? doc : null}
                         />
                         <div className="flex justify-between w-full items-center md:items-start gap-2 mb-1">

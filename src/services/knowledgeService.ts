@@ -57,36 +57,45 @@ export const knowledgeService = {
   },
 
   async listGraphs(metaArea?: string): Promise<GraphListItem[]> {
-    let url = `${API_BASE_URL}/getknowgraphs`;
-    
-    // If a specific area is selected, use the summaries endpoint which supports filtering
+    const headers = { 'X-API-Token': getApiToken() };
+
+    // A specific area: the summaries endpoint filters by it (one page of up to 250, as before).
     if (metaArea && metaArea !== 'All') {
-      url = `https://knowledge.vegvisr.org/getknowgraphsummaries?metaArea=${encodeURIComponent(metaArea)}&limit=250`;
+      const url = `${API_BASE_URL}/getknowgraphsummaries?metaArea=${encodeURIComponent(metaArea)}&limit=250`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) throw new Error('Failed to list graphs');
+      const data = await response.json();
+      return data.results || [];
     }
 
-    const response = await fetch(url, {
-      headers: {
-        'X-API-Token': getApiToken()
+    // All graphs: getknowgraphsummaries rather than getknowgraphs (id + title only), because the
+    // summaries carry each graph's `thumbnail` (2026-11-13). Paged at 250; pages after the first
+    // run in parallel. Only id, title, updatedAt and thumbnail are kept, so the cards look as
+    // they did with getknowgraphs.
+    const PAGE = 250;
+    const fetchPage = async (offset: number) => {
+      const response = await fetch(`${API_BASE_URL}/getknowgraphsummaries?limit=${PAGE}&offset=${offset}`, { headers });
+      if (!response.ok) throw new Error('Failed to list graphs');
+      return response.json();
+    };
+    const first = await fetchPage(0);
+    const pages = [first];
+    const total = Number(first.total || 0);
+    if (first.hasMore && total > PAGE) {
+      const offsets: number[] = [];
+      for (let o = PAGE; o < total; o += PAGE) offsets.push(o);
+      pages.push(...(await Promise.all(offsets.map(fetchPage))));
+    }
+    const seen = new Set<string>();
+    const list: GraphListItem[] = [];
+    for (const page of pages) {
+      for (const r of page.results || []) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        list.push({ id: r.id, title: r.title, updatedAt: r.updatedAt, thumbnail: r.thumbnail ?? null });
       }
-    });
-    if (!response.ok) throw new Error('Failed to list graphs');
-    const data = await response.json();
-    return data.results || [];
-  },
-
-  // Thumbnail for the graph portfolio card. The list endpoints (getknowgraphs,
-  // getknowgraphsummaries, searchGraphs) carry no image field, so the graph itself is read
-  // and its picture chosen the same way the SEO card does: seoOgImage first, then the first
-  // image found in the nodes. '' when the graph has none.
-  async getGraphThumbnail(id: string): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${encodeURIComponent(id)}`, {
-      headers: { 'X-API-Token': getApiToken() }
-    });
-    if (!response.ok) return '';
-    const data = await response.json().catch(() => null);
-    if (!data) return '';
-    const nodes: Node[] = Array.isArray(data.nodes) ? data.nodes : [];
-    return data.metadata?.seoOgImage || findGraphImage(nodes);
+    }
+    return list;
   },
 
   async searchGraphs(query: string, nodeType?: string): Promise<GraphListItem[]> {
@@ -106,6 +115,21 @@ export const knowledgeService = {
     if (!response.ok) throw new Error('Failed to search graphs');
     const data = await response.json();
     return data.results || [];
+  },
+
+  // Thumbnail for the graph portfolio card. The list endpoints (getknowgraphs,
+  // getknowgraphsummaries, searchGraphs) carry no image field, so the graph itself is read
+  // and its picture chosen the same way the SEO card does: seoOgImage first, then the first
+  // image found in the nodes. '' when the graph has none.
+  async getGraphThumbnail(id: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/getknowgraph?id=${encodeURIComponent(id)}`, {
+      headers: { 'X-API-Token': getApiToken() }
+    });
+    if (!response.ok) return '';
+    const data = await response.json().catch(() => null);
+    if (!data) return '';
+    const nodes: Node[] = Array.isArray(data.nodes) ? data.nodes : [];
+    return data.metadata?.seoOgImage || findGraphImage(nodes);
   },
 
   async listMetaAreas(): Promise<MetaAreaItem[]> {

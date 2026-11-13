@@ -67,6 +67,9 @@ export interface GraphListItem {
   nodeTypes?: Record<string, number>;
   nodeCount?: number;
   updatedAt?: string;
+  // From getknowgraphsummaries: the card picture, null when the graph has none. Absent (undefined)
+  // on results that do not carry it (searchGraphs) — the card then reads the graph itself.
+  thumbnail?: string | null;
 }
 
 export interface KnowledgeDocument {
