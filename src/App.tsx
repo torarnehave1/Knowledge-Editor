@@ -252,7 +252,9 @@ export default function App() {
     !error &&
     !viewLocked;
   if (frontPageReady) {
-    return <FrontPageView metadata={doc.metadata} nodes={doc.nodes.filter((node) => node.visible)} />;
+    // Every node, hidden ones too: the front page plan is a hidden json-node. FrontPageView
+    // itself shows only visible nodes.
+    return <FrontPageView metadata={doc.metadata} nodes={doc.nodes} />;
   }
 
   if (isViewMode) {
