@@ -32,9 +32,9 @@ import { LogOut } from 'lucide-react';
 const hasImageContent = (info?: string | null) =>
   !!info && (/!\[[^\]]*\]\([^)]+\)/.test(info) || /<img[^>]+src=["'][^"']+["']/i.test(info));
 
-// A graph card's node types as [type, count] pairs. getknowgraphsummaries and searchGraphs send
-// a list of type names with no counts (count null, shown as the name alone); a map of
-// type -> count shows the count. Before 2026-11-13 the list was read as a map, so the
+// A graph card's node types as [type, count] pairs. getknowgraphsummaries sends the counts in
+// nodeTypeCounts (2026-11-13), which the card prefers; searchGraphs sends only a list of type
+// names (count null, shown as the name alone). Before 2026-11-13 the list was read as a map, so the
 // area-filtered portfolio showed "0: fulltext", "1: image".
 const nodeTypeEntries = (types: GraphListItem['nodeTypes']): Array<[string, number | null]> => {
   if (!types) return [];
@@ -721,9 +721,9 @@ export default function App() {
                         )}
 
                         {/* Node Types Summary */}
-                        {nodeTypeEntries(graph.nodeTypes).length > 0 && (
+                        {nodeTypeEntries(graph.nodeTypeCounts && Object.keys(graph.nodeTypeCounts).length ? graph.nodeTypeCounts : graph.nodeTypes).length > 0 && (
                           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800 w-full">
-                            {nodeTypeEntries(graph.nodeTypes).map(([type, count]) => (
+                            {nodeTypeEntries(graph.nodeTypeCounts && Object.keys(graph.nodeTypeCounts).length ? graph.nodeTypeCounts : graph.nodeTypes).map(([type, count]) => (
                               <div key={type} className="flex items-center gap-1">
                                 <span className={cn(
                                   "w-1.5 h-1.5 rounded-full",

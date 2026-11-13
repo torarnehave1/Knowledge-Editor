@@ -66,6 +66,8 @@ export interface GraphListItem {
   categories?: string[];
   // A map type -> count, or (getknowgraphsummaries, searchGraphs) a list of type names.
   nodeTypes?: Record<string, number> | string[];
+  // getknowgraphsummaries: nodes per type ({ fulltext: 4 }). Preferred over nodeTypes when set.
+  nodeTypeCounts?: Record<string, number>;
   nodeCount?: number;
   updatedAt?: string;
   // From getknowgraphsummaries: the card picture, null when the graph has none. Absent (undefined)
