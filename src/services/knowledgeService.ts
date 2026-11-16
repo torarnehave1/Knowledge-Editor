@@ -82,7 +82,9 @@ export const knowledgeService = {
     const RETRY_WAIT_MS = [1500, 4000, 10000];
     const fetchPage = async (offset: number) => {
       for (let attempt = 0; ; attempt++) {
-        const response = await fetch(`${API_BASE_URL}/getknowgraphsummaries?limit=${PAGE}&offset=${offset}`, { headers });
+        // fields=card: only id, title, updatedAt and thumbnail — what the cards show — at about
+        // half the database work of the full summary row (dev-worker summary-card.js).
+        const response = await fetch(`${API_BASE_URL}/getknowgraphsummaries?limit=${PAGE}&offset=${offset}&fields=card`, { headers });
         if (response.ok) return response.json();
         const busy = response.status === 500 || response.status === 503;
         if (!busy || attempt >= RETRY_WAIT_MS.length) {
