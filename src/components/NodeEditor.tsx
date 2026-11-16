@@ -80,6 +80,8 @@ const TYPE_LABELS: Record<string, string> = {
   'audio': 'Audio',
   'realtime-video': 'Realtime Video',
   'album-video': 'Album Video',
+  'kursbeskrivelse': 'Kursbeskrivelse',
+  'kurs-steg': 'Kurssteg',
   'cloudflare-video': 'Cloudflare Video',
   'audio-visualizer': 'Audio Visualizer',
   'REG': 'Registration',

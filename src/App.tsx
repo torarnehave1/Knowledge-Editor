@@ -14,7 +14,8 @@ import NodeRenderer from './components/NodeRenderer';
 import FrontPageView from './components/FrontPageView';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
-const MEDIA_NODE_TYPES = ['realtime-video', 'album-video', 'cloudflare-video', 'youtube-video', 'audio', 'audio-visualizer'];
+// kurs-steg: a video step has its video in `path` and an empty info, like realtime-video.
+const MEDIA_NODE_TYPES = ['realtime-video', 'album-video', 'kurs-steg', 'cloudflare-video', 'youtube-video', 'audio', 'audio-visualizer'];
 
 import ReorderModal from './components/ReorderModal';
 import SEOModal from './components/SEOModal';

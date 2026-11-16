@@ -405,7 +405,10 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
     return <AlbumVideo node={node} renderInfo={renderInfo} />;
   }
 
-  if (node.type === 'realtime-video') {
+  // kurs-steg: one step of a course (agent-worker world-course.js). A video step carries the
+  // video in `path` exactly as a realtime-video node does, so it plays in the same player. A text
+  // step has no path and falls through to the ordinary text rendering below.
+  if (node.type === 'realtime-video' || (node.type === 'kurs-steg' && node.path)) {
     const videoUrl = resolveRealtimeVideoUrl(node.path, node.publicUrl);
 
     return (
