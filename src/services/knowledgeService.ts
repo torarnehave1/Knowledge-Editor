@@ -74,11 +74,22 @@ export const knowledgeService = {
     // summaries carry each graph's `thumbnail` (2026-11-13). Paged at 250; pages after the first
     // run in parallel. Only id, title, updatedAt and thumbnail are kept, so the cards look as
     // they did with getknowgraphs.
+    // Pages are fetched ONE AT A TIME, and a page the database turns away (500/503) is tried
+    // again after a pause. Fetching all pages at once (2026-11-13) made D1 answer "overloaded —
+    // too many resources consumed within a 10 second window" for some of them (2096 graphs =
+    // 9 pages, seen 2026-11-16), and one failed page failed the whole list.
     const PAGE = 250;
+    const RETRY_WAIT_MS = [1500, 4000, 10000];
     const fetchPage = async (offset: number) => {
-      const response = await fetch(`${API_BASE_URL}/getknowgraphsummaries?limit=${PAGE}&offset=${offset}`, { headers });
-      if (!response.ok) throw new Error('Failed to list graphs');
-      return response.json();
+      for (let attempt = 0; ; attempt++) {
+        const response = await fetch(`${API_BASE_URL}/getknowgraphsummaries?limit=${PAGE}&offset=${offset}`, { headers });
+        if (response.ok) return response.json();
+        const busy = response.status === 500 || response.status === 503;
+        if (!busy || attempt >= RETRY_WAIT_MS.length) {
+          throw new Error(`Failed to list graphs (page at ${offset}: HTTP ${response.status})`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, RETRY_WAIT_MS[attempt]));
+      }
     };
     const toItems = (page: any, seen: Set<string>): GraphListItem[] => {
       const out: GraphListItem[] = [];
@@ -94,9 +105,7 @@ export const knowledgeService = {
     const pages = [first];
     const total = Number(first.total || 0);
     if (first.hasMore && total > PAGE) {
-      const offsets: number[] = [];
-      for (let o = PAGE; o < total; o += PAGE) offsets.push(o);
-      pages.push(...(await Promise.all(offsets.map(fetchPage))));
+      for (let o = PAGE; o < total; o += PAGE) pages.push(await fetchPage(o));
     }
     const seen = new Set<string>();
     return pages.flatMap((page) => toItems(page, seen));
