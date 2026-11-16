@@ -195,14 +195,19 @@ export default function App() {
     if (viewMode === 'json') {
       setJsonValue(JSON.stringify(doc, null, 2));
     }
-    if (viewMode === 'graphs') {
-      if (isTrashView) {
-        fetchTrash();
-      } else {
-        fetchGraphs();
-      }
+  }, [viewMode, doc, setJsonValue]);
+
+  // The graph list depends on the view and its filters only. It used to share the effect above,
+  // so every change to the open graph (doc) — e.g. the graph finishing loading while the list was
+  // shown — fetched all 9 list pages again (seen live 2026-11-16: 18 requests per opening).
+  useEffect(() => {
+    if (viewMode !== 'graphs') return;
+    if (isTrashView) {
+      fetchTrash();
+    } else {
+      fetchGraphs();
     }
-  }, [viewMode, doc, selectedMetaArea, selectedNodeType, searchQuery, isTrashView, fetchGraphs, fetchTrash, setJsonValue]);
+  }, [viewMode, selectedMetaArea, selectedNodeType, searchQuery, isTrashView, fetchGraphs, fetchTrash]);
 
   const handleApplyJson = () => {
     setError(null);
