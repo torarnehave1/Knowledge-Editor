@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Node } from '../types';
-import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film } from 'lucide-react';
+import { Music, Play, Pause, Volume2, SkipBack, SkipForward, Activity, Film, Maximize2, Minus, Plus, X } from 'lucide-react';
 import { resolveRealtimeVideoUrl, resolveCloudflareVideo } from '../services/realtimeVideos';
 import { RegisteredTypeNode, useApprovedTypes } from '../lib/vegvisrNode';
 import { useStore } from '../store/useStore';
@@ -58,8 +59,10 @@ const getMermaid = () => {
 
 let mermaidIdCounter = 0;
 
-function MermaidDiagram({ code }: { code: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+// One rendering of a diagram. The inline view and the full-window view each render their own
+// copy, so no element id appears twice on the page.
+function useMermaidSvg(code: string) {
+  const [svg, setSvg] = useState('');
   const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,9 +71,7 @@ function MermaidDiagram({ code }: { code: string }) {
     getMermaid()
       .then((mermaid) => mermaid.render(`mermaid-graph-${++mermaidIdCounter}`, code))
       .then(({ svg }) => {
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg;
-        }
+        if (!cancelled) setSvg(svg);
       })
       .catch((err) => {
         console.error('Mermaid rendering error:', err);
@@ -81,20 +82,184 @@ function MermaidDiagram({ code }: { code: string }) {
     };
   }, [code]);
 
-  if (renderError) {
-    return (
-      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4">
-        <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-2">Error rendering Mermaid diagram: {renderError}</p>
-        <pre className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap overflow-x-auto">{code}</pre>
-      </div>
-    );
-  }
+  return { svg, renderError };
+}
 
+function MermaidError({ message, code }: { message: string; code: string }) {
   return (
+    <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4">
+      <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-2">Error rendering Mermaid diagram: {message}</p>
+      <pre className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap overflow-x-auto">{code}</pre>
+    </div>
+  );
+}
+
+// A Gantt chart is laid out to the width it is drawn in, so on a phone its labels collide. In the
+// full window it is laid out wide and scaled to fit, and zooming brings the labels up.
+const wideGantt = (code: string) =>
+  /^\s*gantt\b/.test(code) && !code.includes('%%{') ? `%%{init: {"gantt": {"useWidth": 1600}}}%%\n${code}` : code;
+
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 8;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+
+// A diagram in the whole window, with zoom and pan: buttons, the wheel, dragging with the mouse
+// or one finger, pinching with two fingers. It is a fixed layer drawn on <body>, not the
+// browser's Fullscreen API, which iPhone does not offer for anything but video.
+function MermaidFullView({ code, title, onClose }: { code: string; title?: string; onClose: () => void }) {
+  const lang = useBrand().lang;
+  const { svg, renderError } = useMermaidSvg(wideGantt(code));
+  const [t, setT] = useState({ z: 1, x: 0, y: 0 });
+  const zRef = useRef(1);
+  zRef.current = t.z;
+  const pts = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; z: number } | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  const zoomBy = (f: number) => setT((p) => ({ ...p, z: clampZoom(p.z * f) }));
+  const reset = () => setT({ z: 1, x: 0, y: 0 });
+
+  // The drawing fills the sheet; its viewBox keeps the proportions.
+  useEffect(() => {
+    const el = sheetRef.current?.querySelector('svg');
+    if (!el) return;
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.style.maxWidth = 'none';
+  }, [svg]);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === '+' || e.key === '=') zoomBy(1.25);
+      else if (e.key === '-') zoomBy(1 / 1.25);
+      else if (e.key === '0') reset();
+    };
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('keydown', key);
+      document.body.style.overflow = before;
+    };
+  }, [onClose]);
+
+  const spread = () => {
+    const [a, b] = [...pts.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+  const drop = (e: React.PointerEvent<HTMLDivElement>) => {
+    pts.current.delete(e.pointerId);
+    if (pts.current.size < 2) pinch.current = null;
+  };
+
+  const tool =
+    'inline-flex items-center justify-center min-w-10 h-10 px-3 rounded-full border border-zinc-300 dark:border-zinc-700 text-sm font-medium text-zinc-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer';
+
+  return createPortal(
     <div
-      ref={containerRef}
-      className="w-full overflow-x-auto my-4 flex justify-center items-center [&_svg]:max-w-full [&_svg]:h-auto"
-    />
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || 'Diagram'}
+      className="fixed inset-0 z-[1000] flex flex-col bg-white dark:bg-zinc-950"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
+        <strong className="min-w-0 flex-1 basis-40 text-base text-zinc-900 dark:text-zinc-100 break-words">{title}</strong>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className={tool} aria-label={lang === 'no' ? 'Zoom ut' : 'Zoom out'} onClick={() => zoomBy(1 / 1.25)}>
+            <Minus size={16} />
+          </button>
+          <span className="min-w-12 text-center text-sm tabular-nums text-zinc-500 dark:text-zinc-400" aria-live="polite">
+            {Math.round(t.z * 100)}%
+          </span>
+          <button type="button" className={tool} aria-label={lang === 'no' ? 'Zoom inn' : 'Zoom in'} onClick={() => zoomBy(1.25)}>
+            <Plus size={16} />
+          </button>
+          <button type="button" className={tool} onClick={reset}>
+            {lang === 'no' ? 'Tilpass' : 'Fit'}
+          </button>
+          <button ref={closeRef} type="button" className={tool} onClick={onClose}>
+            <X size={16} className="mr-1" />
+            {lang === 'no' ? 'Lukk' : 'Close'}
+          </button>
+        </div>
+      </div>
+      <div
+        className="relative flex-1 min-h-0 overflow-hidden bg-white touch-none select-none cursor-grab active:cursor-grabbing"
+        onPointerDown={(e) => {
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* the pointer is already gone */
+          }
+          pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pts.current.size === 2) pinch.current = { d: spread(), z: zRef.current };
+        }}
+        onPointerMove={(e) => {
+          const prev = pts.current.get(e.pointerId);
+          if (!prev) return;
+          const dx = e.clientX - prev.x;
+          const dy = e.clientY - prev.y;
+          pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          const p = pinch.current;
+          if (pts.current.size >= 2 && p && p.d > 0) {
+            const z = clampZoom((p.z * spread()) / p.d);
+            setT((o) => ({ ...o, z }));
+          } else if (pts.current.size === 1) setT((o) => ({ ...o, x: o.x + dx, y: o.y + dy }));
+        }}
+        onPointerUp={drop}
+        onPointerCancel={drop}
+        onWheel={(e) => zoomBy(e.deltaY > 0 ? 1 / 1.15 : 1.15)}
+      >
+        {renderError ? (
+          <div className="absolute inset-0 overflow-auto p-4">
+            <MermaidError message={renderError} code={code} />
+          </div>
+        ) : (
+          <div
+            ref={sheetRef}
+            className="absolute inset-3 flex items-center justify-center"
+            style={{ transform: `translate(${t.x}px, ${t.y}px) scale(${t.z})`, transformOrigin: 'center center' }}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function MermaidDiagram({ code, title }: { code: string; title?: string }) {
+  const lang = useBrand().lang;
+  const { svg, renderError } = useMermaidSvg(code);
+  const [full, setFull] = useState(false);
+  const close = React.useCallback(() => setFull(false), []);
+
+  if (renderError) return <MermaidError message={renderError} code={code} />;
+
+  const label = lang === 'no' ? 'Vis i fullt vindu' : 'Show in full window';
+  return (
+    <div className="relative my-4">
+      <div className="flex justify-end mb-1">
+        <button
+          type="button"
+          onClick={() => setFull(true)}
+          title={label}
+          aria-label={label}
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+        >
+          <Maximize2 size={14} />
+          {label}
+        </button>
+      </div>
+      <div
+        className="w-full overflow-x-auto flex justify-center items-center [&_svg]:max-w-full [&_svg]:h-auto"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      {full && <MermaidFullView code={code} title={title} onClose={close} />}
+    </div>
   );
 }
 
@@ -479,7 +644,7 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
   if (!node.info) return null;
 
   if (node.type === 'mermaid-diagram') {
-    return <MermaidDiagram code={node.info} />;
+    return <MermaidDiagram code={node.info} title={node.label} />;
   }
 
   if (node.type === 'html-node') {
