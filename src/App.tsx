@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar';
 import { MobileHeader, MobileBottomNav, Sheet, SheetAction } from './components/MobileChrome';
 import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
+import { useApprovedTypes } from './lib/vegvisrNode';
 import FrontPageView from './components/FrontPageView';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
@@ -53,6 +54,8 @@ function cn(...inputs: ClassValue[]) {
 const isNodeCollapsed = (node: Node) => node.metadata?.collapsed === true;
 
 export default function App() {
+  // Types drawn by their own approved renderer: an empty info is not an empty section for them.
+  const approvedTypes = useApprovedTypes(useStore((st) => st.graphWorld));
   const params = new URLSearchParams(window.location.search);
   const graphId = params.get('graphId');
   const isViewMode = window.location.pathname === '/view' && !!graphId;
@@ -941,7 +944,7 @@ export default function App() {
                             <p className="text-xs">Open this section and drop, paste or choose an image.</p>
                           </div>
                         ) : (
-                          viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && (
+                          viewMode === 'edit' && !node.info && !MEDIA_NODE_TYPES.includes(node.type) && !approvedTypes.has(node.type) && (
                             // The whole empty box opens the section editor. Before 2026-10-27 it only
                             // said "Click edit" and the edit icon appeared on hover alone, so an empty
                             // section (e.g. a new html-node) looked impossible to edit.

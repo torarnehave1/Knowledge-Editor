@@ -641,6 +641,15 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
     );
   }
 
+  // A registered data type with an approved renderer: drawn by <vegvisr-node> in an isolated
+  // iframe. Checked before the empty-text rule below: such a node may carry all its content in
+  // metadata (e.g. project-timeline-event: date, kind, participants) with an empty info. Only
+  // registered data types have such a renderer, so the built-in branches are untouched.
+  if (node.type && approvedTypes.has(node.type)) {
+    const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    return <RegisteredTypeNode node={{ ...node, metadata: node.metadata || {} }} theme={dark ? 'dark' : 'light'} world={world} />;
+  }
+
   if (!node.info) return null;
 
   if (node.type === 'mermaid-diagram') {
@@ -668,13 +677,6 @@ export default function NodeRenderer({ node, editable = false }: NodeRendererPro
         />
       </div>
     );
-  }
-
-  // A registered data type with an approved renderer: drawn by <vegvisr-node> in an isolated
-  // iframe. Reached only by types this renderer has no branch for — built-ins are untouched.
-  if (node.type && approvedTypes.has(node.type)) {
-    const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-    return <RegisteredTypeNode node={{ ...node, metadata: node.metadata || {} }} theme={dark ? 'dark' : 'light'} world={world} />;
   }
 
   // Handle ![Leftside-N|styles](url) / ![Rightside-N|styles](url) — parity
