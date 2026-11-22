@@ -781,7 +781,35 @@ export default function App() {
                     {graphList.length === 0 && (
                       <div className="col-span-full py-20 text-center text-zinc-400">
                         <Database size={48} className="mx-auto mb-4 opacity-20" />
-                        <p>No graphs found with the selected filter.</p>
+                        <p>{searchQuery.trim() ? <>No graphs found for “{searchQuery.trim()}”.</> : 'No graphs found with the selected filter.'}</p>
+                        {/* An empty search suggests meta areas (owner decision 2026-11-22): the
+                            areas whose name holds the word, else the largest ones. From the list
+                            already loaded for the Filter menu, so it costs no extra request. */}
+                        {searchQuery.trim() && Array.isArray(metaAreas) && metaAreas.length > 0 && (() => {
+                          const norm = (s: string) => s.toLowerCase().replace(/#/g, '').trim();
+                          const q = norm(searchQuery);
+                          const byCount = [...metaAreas].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+                          const matching = byCount.filter((a) => norm(a.name).includes(q) || (norm(a.name) && q.includes(norm(a.name))));
+                          const shown = (matching.length ? matching : byCount).slice(0, 8);
+                          return (
+                            <div className="mt-6">
+                              <p className="text-xs font-bold uppercase tracking-widest mb-3">
+                                {matching.length ? 'Meta areas that match' : 'Try a meta area'}
+                              </p>
+                              <div className="flex flex-wrap justify-center gap-2">
+                                {shown.map((a) => (
+                                  <button
+                                    key={a.name}
+                                    onClick={() => { setSearchQuery(''); setSelectedMetaArea(a.name); }}
+                                    className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                                  >
+                                    {a.name} <span className="text-zinc-400">{a.count}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
