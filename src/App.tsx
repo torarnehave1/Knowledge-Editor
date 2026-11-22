@@ -197,6 +197,13 @@ export default function App() {
     }
   }, [viewMode, doc, setJsonValue]);
 
+  // The search box holds its own text; the list is searched only on Enter (owner decision
+  // 2026-11-22). Searching on every keystroke sent S, SK, SKU… — each a full scan of all graphs —
+  // and with the paged list load in the same 10 s window D1 answered "overloaded" (500/503).
+  // Enter on an empty box returns to the full list. searchQuery set elsewhere shows in the box.
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  useEffect(() => { setSearchInput(searchQuery); }, [searchQuery]);
+
   // The graph list depends on the view and its filters only. It used to share the effect above,
   // so every change to the open graph (doc) — e.g. the graph finishing loading while the list was
   // shown — fetched all 9 list pages again (seen live 2026-11-16: 18 requests per opening).
@@ -552,9 +559,10 @@ export default function App() {
                           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                           <input 
                             type="text"
-                            placeholder="Search graphs..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search + Enter"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(searchInput.trim()); }}
                             className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold py-1.5 pl-9 pr-3 rounded-lg border-none focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-48 max-md:text-base max-md:py-2.5"
                           />
                         </div>
