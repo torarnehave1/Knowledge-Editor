@@ -59,6 +59,8 @@ export default function App() {
   const params = new URLSearchParams(window.location.search);
   const graphId = params.get('graphId');
   const isViewMode = window.location.pathname === '/view' && !!graphId;
+  // /view?graphId=…&nodeId=… shows that one node only, without the graph title: for embedding a node elsewhere (the vegr.ai chat).
+  const onlyNodeId = isViewMode ? params.get('nodeId') : null;
 
   const {
     doc,
@@ -302,6 +304,7 @@ export default function App() {
             />
           ) : (
             <>
+              {!onlyNodeId && (
               <header className="mb-12 text-center">
                 <h1 className="text-4xl font-bold mb-4">{doc.metadata?.title || 'Knowledge Graph'}</h1>
                 {doc.metadata?.metaArea && (
@@ -310,8 +313,9 @@ export default function App() {
                   </span>
                 )}
               </header>
+              )}
               {doc.nodes
-                .filter(node => node.visible)
+                .filter(node => (onlyNodeId ? node.id === onlyNodeId : node.visible))
                 .map((node) => {
                   const closed = isNodeCollapsed(node) !== viewToggled.has(node.id);
                   return (
