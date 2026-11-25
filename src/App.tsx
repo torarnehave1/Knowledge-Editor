@@ -1,3 +1,4 @@
+import { sortNodesByOrder } from './utils/nodeOrder';
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Edit2, Trash2, MoreHorizontal, ChevronUp, ChevronDown, ChevronRight, Eye, EyeOff, Code, Plus, Save, Loader2, Database, List, Check, AlertCircle, X, Search, Activity, RotateCcw, Globe, History, Star, ImageOff, Rocket, CheckCircle2 } from 'lucide-react';
@@ -171,11 +172,41 @@ export default function App() {
     }
   }, [checkAuth, fetchAvailableModels, isViewMode]);
 
+  // /view?graphId=…&embed=1 inside the vegr.ai chat panel: this page is a frame on another site and cannot
+  // see the login of an ordinary tab. The vegr.ai parent reads the graph with the person's own login and hands
+  // the content (never the token) over with postMessage; it is drawn by the same code as any /view. If the
+  // parent does not answer in a few seconds the graph is loaded as usual (public graphs).
+  const embedded = isViewMode && params.get('embed') === '1' && window.parent !== window;
+  const [embedWait, setEmbedWait] = useState(embedded);
   useEffect(() => {
-    if (isViewMode && graphId && currentGraphId !== graphId) {
+    if (!embedded || !graphId) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== 'https://vegr.ai' && e.origin !== 'https://www.vegr.ai') return;
+      const m = e.data;
+      if (!m || m.graphId !== graphId) return;
+      if (m.type === 'vegr-graph' && m.graph && typeof m.graph === 'object') {
+        const g = m.graph;
+        g.nodes = sortNodesByOrder(Array.isArray(g.nodes) ? g.nodes : []);
+        g.edges = Array.isArray(g.edges) ? g.edges : [];
+        if (!g.metadata) g.metadata = { title: 'Untitled Graph', description: '' };
+        useStore.setState({ doc: g, currentGraphId: graphId, isLoading: false, error: null, graphWorld: m.world || null });
+        setEmbedWait(false);
+      } else if (m.type === 'vegr-graph-error') {
+        useStore.setState({ error: `Failed to fetch graph (${m.status || 0})`, currentGraphId: graphId, isLoading: false });
+        setEmbedWait(false);
+      }
+    };
+    window.addEventListener('message', onMessage);
+    window.parent.postMessage({ type: 'vegr-graph-request', graphId }, '*');
+    const t = window.setTimeout(() => setEmbedWait(false), 4000);
+    return () => { window.removeEventListener('message', onMessage); window.clearTimeout(t); };
+  }, [embedded, graphId]);
+
+  useEffect(() => {
+    if (isViewMode && graphId && currentGraphId !== graphId && !embedWait) {
       loadGraph(graphId);
     }
-  }, [isViewMode, graphId, currentGraphId, loadGraph]);
+  }, [isViewMode, graphId, currentGraphId, loadGraph, embedWait]);
 
   // /view refused because nobody is signed in: keep the sign-in form up until the user IS signed
   // in. Asking for the link clears the store's error, and without this the page fell back to the
