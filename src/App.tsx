@@ -14,6 +14,8 @@ import NodeEditor from './components/NodeEditor';
 import NodeRenderer from './components/NodeRenderer';
 import { useApprovedTypes } from './lib/vegvisrNode';
 import FrontPageView from './components/FrontPageView';
+import MilestoneView from './components/MilestoneView';
+import { checkMilestonePlan } from './lib/milestonePlan';
 
 // Media nodes render from `path`, not `info` — no "add content" placeholder.
 // kurs-steg: a video step has its video in `path` and an empty info, like realtime-video.
@@ -306,6 +308,27 @@ export default function App() {
     return <FrontPageView metadata={doc.metadata} nodes={doc.nodes} />;
   }
 
+  // /view?graphId=…&layout=milepael draws a milestone plan (MilestoneView), only with the
+  // parameter (Tor Arne, 2026-11-27). A graph that is not a plan, or one with more than one start
+  // or end or edges in a ring, falls back to the standard view below, which then says why.
+  const milestoneReady =
+    isViewMode &&
+    (layoutParam === 'milepael' || layoutParam === 'milepæl') &&
+    !(viewNeedsLogin && !localStorage.getItem('emailVerificationToken')) &&
+    !isLoading &&
+    currentGraphId === graphId &&
+    !error &&
+    !viewLocked;
+  const milestoneCheck = milestoneReady ? checkMilestonePlan(doc.nodes, doc.edges || []) : null;
+  if (milestoneReady && milestoneCheck === null) {
+    return <MilestoneView metadata={doc.metadata} nodes={doc.nodes} edges={doc.edges || []} />;
+  }
+  const milestoneProblem = milestoneReady
+    ? milestoneCheck === 'none'
+      ? 'Grafen er ikke en milepælsplan (den har ingen node av typen milepael-start), så den vises på vanlig måte.'
+      : `Milepælsplanen kan ikke tegnes: ${milestoneCheck} Grafen vises derfor på vanlig måte.`
+    : null;
+
   if (isViewMode) {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-y-auto p-8">
@@ -335,6 +358,12 @@ export default function App() {
             />
           ) : (
             <>
+              {milestoneProblem && (
+                <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-5 py-4 text-sm text-amber-900 dark:text-amber-200">
+                  <AlertCircle size={18} className="flex-none mt-0.5" />
+                  <p>{milestoneProblem}</p>
+                </div>
+              )}
               {!onlyNodeId && (
               <header className="mb-12 text-center">
                 <h1 className="text-4xl font-bold mb-4">{doc.metadata?.title || 'Knowledge Graph'}</h1>
